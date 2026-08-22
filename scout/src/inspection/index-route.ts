@@ -155,6 +155,19 @@ export async function runQuery(url: URL, env: Env): Promise<Response> {
         }))
       });
     }
+    case "objects": {
+      const keyPath = url.searchParams.get("keyPath");
+      const value = url.searchParams.get("value");
+      if (!keyPath || !value) {
+        return Response.json(
+          { error: "keyPath and value are required" },
+          { status: 400 }
+        );
+      }
+      return Response.json({
+        objects: await agent.objectsWithValue({ keyPath, value })
+      });
+    }
     case "search": {
       const pattern = url.searchParams.get("pattern");
       if (!pattern) {
@@ -293,7 +306,10 @@ export async function runFileIssue(
     }))
   );
 
-  const open = await listOpenIssues(env.SPECKLE_TOKEN, projectId);
+  // Suppression is off (see SUPPRESS_ALREADY_REPORTED in workflow.ts); pass
+  // ?dedupe=1 to exercise it here without changing the deployed behaviour.
+  const dedupe = url.searchParams.get("dedupe") === "1";
+  const open = dedupe ? await listOpenIssues(env.SPECKLE_TOKEN, projectId) : [];
   const seen = extractFingerprints(open.map((issue) => issue.rawDescription));
   const fresh = withPrints.filter((entry) => !seen.has(entry.print));
 

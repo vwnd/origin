@@ -36,6 +36,21 @@ import type { InspectionAgent } from "./agent";
  * return. Only counts and findings do; the data stays in the agent.
  */
 
+/**
+ * Whether findings already reported in an open issue are suppressed.
+ *
+ * Off for now: every run files everything it finds. Dedupe is correct
+ * behaviour for a project in steady use — it stops a republished model
+ * re-filing the same problem — but while iterating it hides exactly the
+ * findings you are trying to see, because the first run of the day claims them
+ * and every later run reports "no new findings".
+ *
+ * Fingerprints are still written into each issue, so flipping this back to
+ * `true` restores suppression with no other change and the existing issues
+ * remain readable as history.
+ */
+const SUPPRESS_ALREADY_REPORTED = false;
+
 export type InspectionParams = {
   projectId: string;
   versionId: string;
@@ -155,6 +170,14 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
           print: await fingerprint(finding)
         }))
       );
+
+      if (!SUPPRESS_ALREADY_REPORTED) {
+        logger.info("dedupe_skipped", { findings: withPrints.length });
+        return {
+          findings: withPrints.map((entry) => entry.finding),
+          fingerprints: withPrints.map((entry) => entry.print)
+        };
+      }
 
       const open = await listOpenIssues(this.env.SPECKLE_TOKEN, projectId);
       const seen = extractFingerprints(
