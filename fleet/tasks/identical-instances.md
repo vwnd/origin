@@ -10,6 +10,9 @@ overlap (phasing, design options, grouped assemblies). Propose deleting only
 true duplicates.
 
 ## Inputs
+Model-data bullets are the query contract with the cache agent (runtime.md):
+query only these objects and fields, cheapest first — warning seed before
+placement data.
 - Imported Revit warnings: "There are identical instances in the same
   place." (detection seed — see fleet-rules.md, Detection sources)
 - Instance placement points, type, level, rotation/orientation, phase

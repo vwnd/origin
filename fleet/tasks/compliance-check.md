@@ -11,6 +11,8 @@ update CRs where the correct value is defensible; deliver diagnosis where it
 is a design decision. Never guess a rating into existence.
 
 ## Inputs
+Model-data bullets are the query contract with the cache agent (runtime.md):
+query only these objects and fields, cheapest first.
 - Element parameters for every category named in the compliance rules
   (typically walls, doors, floors, rooms): the rule's target parameter,
   type name, level, host relationships, phase

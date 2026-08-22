@@ -8,6 +8,8 @@ Propose renames for outliers. Never invent a convention; infer it
 or read it from the project standards file if one exists.
 
 ## Inputs
+Model-data bullets are the query contract with the cache agent (runtime.md):
+query only these objects and fields, cheapest first.
 - All Room objects: Name, Number, Level, Department, Area
 - Project standards file (optional): /standards/naming.md
 - Exceptions log: fleet/state/exceptions.md

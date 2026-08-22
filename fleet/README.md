@@ -28,6 +28,7 @@ fleet/
   README.md              this file
   fleet-rules.md         global runner rules: batch cap, severity ordering, safety invariants
   scope-map.md           who detects what, deliverable class per issue, design principles
+  runtime.md             cache agent + task agents (A/B) execution structure
   tasks/                 one markdown file per task — the customizable product surface
     nomenclature.md
     compliance-check.md
@@ -58,6 +59,11 @@ about the issue, the imported warning list is the detection seed and the agent
 adds the judgment on top — triage, keeper calls, fix drafting, packaging. Only
 semantic tasks detect from scratch.
 
+At run time, each task's **Inputs section is a query contract** (runtime.md): a
+cache agent downloads from Speckle once per run, and the task agent SQL-queries
+it for exactly the fields and filters its Inputs list — small subsets, short
+agent time.
+
 ## Fix-policy classes
 
 - **Auto-propose** — deterministic fix; the agent adds rationale and a confidence call.
@@ -66,8 +72,8 @@ semantic tasks detect from scratch.
 - **Diagnose-only** — frequently a design condition in progress, not an error.
   Never auto-fix; a precise diagnosis is the deliverable.
 - **[context and rec]** — the fix must happen by hand in Revit, so the
-  deliverable is a context & recommendation report: located (Select-by-ID-ready
-  IDs, level, grid), dissected, with a recommended action. The fleet does the
+  deliverable is a context & recommendation report: element IDs (Speckle/Revit
+  auto-locate from them), dissection, recommended action. The fleet does the
   finding and the judgement; the user does the clicking.
 
 ## Safety model
@@ -108,11 +114,9 @@ The task markdowns and the standards files are the product surface a firm edits:
 - Phase/hosting data through Speckle — instance dedup needs it.
 - Element **delete** operations in the CR round trip (alongside parameter
   writes) — identical-instances proposes deletes in v1.
-- **(Parked) server-side view rendering** for context & rec reports: wireframe,
-  camera framing, highlight, screenshot capture. Only worth building as a
-  deterministic, automatically-fired pipeline step — never agent-driven
-  (fleet-rules.md, Automate before agents). Reports work without it via
-  Select by ID + level/grid locate info.
+- SQL-queryable access to the cached Speckle download (the cache agent's
+  serving layer — runtime.md), plus per-run instrumentation (queries issued,
+  subset sizes, agent time) to feed the assess-then-automate decision.
 - **Issue panel grouping**: the panel should group issues that can be fixed or
   inspected conveniently in batch — by proposed-action type, then level — and
   feed dismiss-with-reason back to the agent layer like CR rejections.

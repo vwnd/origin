@@ -9,11 +9,10 @@ it found, dissected, and with a recommended action.
 Produced by [context and rec] tasks (overlap-locator, off-axis-lines) and
 surfaced on the server's issue-management panel alongside CRs.
 
-**Parked: rendered views.** Screenshot/viewer generation is not agent work —
-agents are for small fast judgment, not driving a viewer and waiting on loads.
-Location is delivered as data (below); rendered views return only if infra
-ships them as a deterministic, automatically-fired pipeline step (camera from
-element bounding box, wireframe, highlight — no agent in the loop).
+**No locator/viewer.** Screenshot/viewer generation is out of scope for this
+project — Speckle and Revit already point to an issue's location automatically
+from its element IDs. A report carries the IDs and the analysis; the tools do
+the pointing.
 
 ## Location
 
@@ -28,8 +27,8 @@ fleet/state/reports/context-rec/YYYY-MM-DD/<issue-id>.md
 
 - **Task**: overlap-locator · **Severity**: model integrity · **Confidence**: high
 - **Elements**: model line 611402, wall 512230 ("Interior - 4 7/8\" Partition")
-- **Locate**: Revit → Manage → Select by ID → `611402` · Level 2, grids C3–C4,
-  corridor south wall
+- **Where**: Level 2, grids C3–C4, corridor south wall (IDs above auto-locate
+  in Speckle/Revit)
 
 ## Context
 Model line 611402 runs collinear with wall 512230's location line for 3.2 m —
@@ -44,9 +43,9 @@ disposable one.)
 
 ### Field rules
 
-- **Locate** always gives element IDs ready for Revit's Select by ID — the
-  deterministic locator that needs no rendering — plus level and nearest grid
-  cell. The user should never have to search.
+- **Elements/Where** — element IDs (Speckle/Revit auto-locate from them) plus
+  level and nearest grid cell for human orientation when reading the report
+  away from the model.
 - **Context** is one short paragraph of dissection: what, extent (measured,
   from geometry inference), and likely cause when recent-change data
   supports it.

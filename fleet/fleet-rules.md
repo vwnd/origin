@@ -32,13 +32,16 @@ similar manual fixes batch into one Revit sitting.
 Agents are for small, fast judgment tasks — not for driving viewers, waiting on
 loads, or mechanical data shuffling. Whenever a workflow step is
 deterministically automatable (data extraction and shaping, like the JSON
-exports in the bim2graph pipeline; warning-list import; select-by-ID locate
-info), it belongs in the pipeline as automation, not in an agent prompt. This
-keeps agent work time short and agent output focused on the judgment layer:
-triage, keeper calls, rationale. Rendered views for reports are parked under
-this rule — they return only as a deterministic, automatically-fired pipeline
-step, never as agent work. (Pipeline-side automation is largely the infra
-teammates' scope; this section states the boundary.)
+exports in the bim2graph pipeline; warning-list import), it belongs in the
+pipeline as automation, not in an agent prompt. This keeps agent work time
+short and agent output focused on the judgment layer: triage, keeper calls,
+rationale. Screenshot/viewer generation is out of scope for this project
+entirely — Speckle/Revit auto-locate from element IDs. The runtime follows the
+same logic: a cache agent downloads from Speckle once per run and task agents
+SQL-query it for small subsets (runtime.md); after v1 runs, instrumentation
+decides which recurring data translations get automated deterministically.
+(Pipeline-side automation is largely the infra teammates' scope; this section
+states the boundary.)
 
 ## Detection sources: warnings first
 

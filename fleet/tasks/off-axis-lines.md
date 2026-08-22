@@ -13,6 +13,9 @@ the fix is manual (guided by the report); at v2 the same detection feeds
 auto-proposed snap CRs.
 
 ## Inputs
+Model-data bullets are the query contract with the cache agent (runtime.md):
+query only these objects and fields, cheapest first — warning seed before
+geometry.
 - Imported Revit warnings: "Line is slightly off axis and may cause
   inaccuracies." (detection seed — see fleet-rules.md, Detection sources)
 - Line, wall location line, and reference plane geometry: curve, angle,
@@ -41,10 +44,9 @@ auto-proposed snap CRs.
 
 ## Fix policy: [context and rec] (v1.5) → auto-propose snap (v2)
 - **v1.5**: each finding is a context & recommendation report
-  (formats/context-rec-report.md): Select-by-ID-ready element ID plus
-  level/grid location, deviation stated exactly ("0.07° off axis; far end
-  4 mm out over 3.4 m"), and the recommended manual fix (rotate/snap to
-  axis, which end to hold).
+  (formats/context-rec-report.md): element ID plus level/grid, deviation
+  stated exactly ("0.07° off axis; far end 4 mm out over 3.4 m"), and the
+  recommended manual fix (rotate/snap to axis, which end to hold).
 - **v2**: for high-confidence sloppy findings, auto-propose the snap as a
   CR — deterministic transform, rationale, confidence call. The
   intentional-angle judgment and thresholds carry over unchanged.

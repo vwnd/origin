@@ -10,6 +10,9 @@ them. The value-add is scheme-consistent renumbering plus the
 intentional-vs-accidental call.
 
 ## Inputs
+Model-data bullets are the query contract with the cache agent (runtime.md):
+query only these objects and fields, cheapest first — warning seed before
+element data.
 - Imported Revit warnings: "Elements have duplicate 'Mark' values."
   (detection seed — see fleet-rules.md, Detection sources)
 - Element Mark parameters by category (doors, windows, casework, equipment,

@@ -45,11 +45,14 @@ data before the deliverable can be produced.
    deterministically automatable (e.g., data extraction), automate it in the pipeline so agent work time stays
    short. Partly a note for the infra teammates' scope
    (fleet-rules.md, Automate before agents).
-3. **Locator/viewer is parked** — screenshot/viewer generation is not agent
-   work. [context and rec] reports locate issues with element IDs (Revit's
-   Select by ID is the deterministic locator), level, and grid references.
-   Rendered views return only if infra ships them as a deterministic,
-   automatically-fired step.
+3. **No locator/viewer in this project** — Speckle and Revit already point to
+   an issue's location automatically from its element IDs, so reports carry
+   IDs and context, nothing more. Screenshot/viewer generation is out of
+   scope.
+4. **Cache-and-query runtime** — one cache agent downloads from Speckle once
+   per run; task agents SQL-query it for small subsets and send outputs to
+   the server. Run it, instrument it, then assess which data translations to
+   automate deterministically (runtime.md).
 
 ## Resolved questions
 

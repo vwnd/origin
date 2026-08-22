@@ -9,6 +9,9 @@ explain the decision. The value-add is the keeper call — Revit can flag the
 duplicate; it cannot tell you which room is the mistake.
 
 ## Inputs
+Model-data bullets are the query contract with the cache agent (runtime.md):
+query only these objects and fields, cheapest first — warning seed before
+room data.
 - Imported Revit warnings: duplicate room 'Number' values (detection seed —
   see fleet-rules.md, Detection sources)
 - All Room objects: Number, Name, Level, Department, Area, phase,

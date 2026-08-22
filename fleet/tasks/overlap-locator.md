@@ -6,12 +6,15 @@ Severity class: 3 (model integrity) · Phase: v1.5 (geometry read) · Fix policy
 Overlaps are frequent, annoying to find, and annoying to inspect — the work
 is not the fix, it's the locating and the judgement. This task does that
 work: each overlap arrives as a context & recommendation report — element
-IDs ready for Select by ID, measured extent, one-paragraph dissection, and
-a recommended action — on the issue panel. The user fixes manually in
-Revit, with zero search-and-squint effort. Never writes anything.
-(Rendered views are parked — see formats/context-rec-report.md.)
+IDs (Speckle/Revit auto-locate from them), measured extent, one-paragraph
+dissection, and a recommended action — on the issue panel. The user fixes
+manually in Revit, with zero search-and-squint effort. Never writes
+anything.
 
 ## Inputs
+Model-data bullets are the query contract with the cache agent (runtime.md):
+query only these objects and fields, cheapest first — warning seed before
+geometry.
 - Imported Revit warnings: "Highlighted walls overlap." and wall–line
   overlap warnings (detection seed — see fleet-rules.md, Detection sources)
 - Wall location lines, model/detail line geometry, reference planes:
@@ -43,9 +46,8 @@ Revit, with zero search-and-squint effort. Never writes anything.
 
 ## Fix policy: [context and rec]
 No CRs. Each finding becomes a context & recommendation report
-(formats/context-rec-report.md): Select-by-ID-ready element IDs plus
-level/grid location, one-paragraph dissection with measured extent, and a
-concrete recommended action.
+(formats/context-rec-report.md): element IDs plus level/grid, one-paragraph
+dissection with measured extent, and a concrete recommended action.
 
 ## Confidence gate
 - High: overlap geometry is unambiguous and the proposed action is clear
