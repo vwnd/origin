@@ -16,3 +16,40 @@
   --color-green-900: #0A5331;
   --color-green-950: #052E16;
 }
+
+/* Demo deck slide transitions, direction set by middleware/slide-transition.global.ts */
+.slide-forward-enter-active,
+.slide-forward-leave-active,
+.slide-back-enter-active,
+.slide-back-leave-active {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.slide-forward-enter-from,
+.slide-back-leave-to {
+  opacity: 0;
+  transform: translateX(2rem);
+}
+
+.slide-forward-leave-to,
+.slide-back-enter-from {
+  opacity: 0;
+  transform: translateX(-2rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-forward-enter-active,
+  .slide-forward-leave-active,
+  .slide-back-enter-active,
+  .slide-back-leave-active {
+    transition: opacity 100ms ease;
+    transform: none;
+  }
+
+  .slide-forward-enter-from,
+  .slide-forward-leave-to,
+  .slide-back-enter-from,
+  .slide-back-leave-to {
+    transform: none;
+  }
+}

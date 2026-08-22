@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
+import type { TableColumn, TableRow } from '@nuxt/ui'
 import type {
   ProjectConventionActivation,
   ProjectConventionListResponse,
@@ -161,8 +161,81 @@ function rowIndexFrom(event: DragEvent) {
   return marker ? Number(marker.dataset.rowIndex) : null
 }
 
-function onDragStart(index: number, event: DragEvent) {
-  if (reordering.value) {
+const tableRoot = useTemplateRef<HTMLElement>('tableRoot')
+
+// For the same reason, whole rows are made draggable after each render rather than in the
+// template. Only rows carrying a handle are marked, which leaves the prose in an expanded
+// description row selectable.
+function markDraggableRows() {
+  tableRoot.value?.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach((row) => {
+    row.draggable = !!row.querySelector('[data-row-index]')
+  })
+}
+
+onMounted(markDraggableRows)
+watch(items, markDraggableRows, { flush: 'post' })
+
+// The dragged row holds its slot in the list, emptied out, while the copy of it under the
+// pointer is the row that is moving.
+const meta = {
+  class: {
+    tr: (row: TableRow<ProjectConventionSummary>) => dragIndex.value === row.index
+      ? 'bg-elevated [&_td]:invisible'
+      : ''
+  }
+}
+
+// Left in the document for the length of the drag, because a drag image is only painted
+// from an element the page still has.
+let dragImage: HTMLElement | null = null
+
+function removeDragImage() {
+  dragImage?.remove()
+  dragImage = null
+}
+
+// Browsers snapshot a `tr` poorly on their own — cell backgrounds drop out, and the cells
+// collapse to the width of their contents. Carrying a clone of the row instead, sized to
+// the widths it had in the table, is what makes the row itself look like the thing moving.
+function useRowAsDragImage(row: HTMLTableRowElement, event: DragEvent) {
+  const bounds = row.getBoundingClientRect()
+  const widths = [...row.cells].map(cell => cell.getBoundingClientRect().width)
+  const clone = row.cloneNode(true) as HTMLTableRowElement
+
+  clone.classList.remove('bg-elevated')
+
+  for (const [index, cell] of [...clone.cells].entries()) {
+    cell.style.width = `${widths[index]}px`
+  }
+
+  const table = document.createElement('table')
+  const body = document.createElement('tbody')
+
+  body.append(clone)
+  table.append(body)
+  table.style.width = '100%'
+  table.style.tableLayout = 'fixed'
+
+  dragImage = document.createElement('div')
+  dragImage.className = 'rounded-lg ring ring-accented bg-default shadow-lg overflow-hidden'
+  dragImage.style.position = 'fixed'
+  dragImage.style.top = '-10000px'
+  dragImage.style.left = '0'
+  dragImage.style.width = `${bounds.width}px`
+  dragImage.style.pointerEvents = 'none'
+  dragImage.append(table)
+
+  document.body.append(dragImage)
+
+  // Offset by where the row was grabbed, so it stays under the pointer rather than jumping.
+  event.dataTransfer?.setDragImage(dragImage, event.clientX - bounds.left, event.clientY - bounds.top)
+}
+
+function onDragStart(event: DragEvent) {
+  const index = rowIndexFrom(event)
+  const row = (event.target as HTMLElement | null)?.closest('tr')
+
+  if (index === null || !row || reordering.value) {
     event.preventDefault()
     return
   }
@@ -177,6 +250,8 @@ function onDragStart(index: number, event: DragEvent) {
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
   }
+
+  useRowAsDragImage(row, event)
 }
 
 // Rows are rearranged as the pointer passes over them, so the list itself is the drag
@@ -208,6 +283,7 @@ function onDragOver(event: DragEvent) {
 // table; the null check makes the second call a no-op.
 async function endDrag(event?: DragEvent) {
   event?.preventDefault()
+  removeDragImage()
 
   if (dragIndex.value === null) {
     return
@@ -360,15 +436,20 @@ function open(convention: ProjectConventionSummary) {
         />
       </div>
 
-      <!-- Drop targets are resolved by delegation, because the rows belong to the table. -->
+      <!-- Drag sources and drop targets are resolved by delegation, because the rows
+           belong to the table. -->
       <div
+        ref="tableRoot"
+        @dragstart="onDragStart"
         @dragover="onDragOver"
         @drop="endDrag"
+        @dragend="endDrag"
       >
         <UTable
           v-model:expanded="expanded"
           :data="items"
           :columns="columns"
+          :meta="meta"
           class="rounded-xl ring ring-default bg-default"
           :ui="{ tr: 'cursor-pointer data-[selectable=true]:hover:bg-elevated/50 data-[expanded=true]:bg-elevated/50' }"
           @select="(_event, row) => open(row.original)"
@@ -377,7 +458,6 @@ function open(convention: ProjectConventionSummary) {
             <div @click.stop>
               <UButton
                 :data-row-index="row.index"
-                draggable="true"
                 icon="i-lucide-grip-vertical"
                 variant="ghost"
                 color="neutral"
@@ -385,9 +465,7 @@ function open(convention: ProjectConventionSummary) {
                 square
                 class="cursor-grab active:cursor-grabbing"
                 :disabled="reordering"
-                :aria-label="`Reorder ${row.original.name}: drag, or press the up and down arrow keys`"
-                @dragstart="onDragStart(row.index, $event)"
-                @dragend="endDrag()"
+                :aria-label="`Reorder ${row.original.name}: drag the row, or press the up and down arrow keys`"
                 @keydown.up.prevent="moveByKey(row.index, -1)"
                 @keydown.down.prevent="moveByKey(row.index, 1)"
               />

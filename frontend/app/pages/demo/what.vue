@@ -1,7 +1,8 @@
 <template>
   <NuxtLayout
     name="demo"
-    next="/demo/why"
+    prev="/demo/why"
+    next="/demo/how"
   >
     <div class="w-full flex-1 p-16 flex flex-col items-center justify-center">
       <ContentRenderer

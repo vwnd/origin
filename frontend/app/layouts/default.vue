@@ -9,6 +9,10 @@ const { data } = await useFetch<ProjectListResponse>('/api/projects', {
 })
 
 const links = computed<NavigationMenuItem[]>(() => [{
+  label: 'Demo',
+  icon: 'i-lucide-presentation',
+  to: '/demo/welcome'
+}, {
   label: 'Projects',
   icon: 'i-lucide-folder',
   to: '/projects',
