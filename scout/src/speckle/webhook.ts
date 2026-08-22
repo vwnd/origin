@@ -6,6 +6,8 @@ import {
   toPublishedVersion
 } from "./types";
 import { recordDelivery, type DeliveryMetrics } from "./analytics";
+import { publishEvent } from "../api/events";
+import { recordRunStarted } from "../api/runs";
 import { createLogger, errorMessage, type Logger } from "./logging";
 
 /** True when this request is a Speckle webhook delivery. */
@@ -195,6 +197,21 @@ async function processDelivery(
     logger.info("inspection_started", {
       instanceId: instance.id,
       ...versionFields
+    });
+
+    await recordRunStarted(env, {
+      instanceId: instance.id,
+      projectId: version.projectId,
+      versionId: version.versionId,
+      modelName: version.modelName
+    });
+    await publishEvent(env, {
+      type: "version_published",
+      projectId: version.projectId,
+      versionId: version.versionId,
+      modelName: version.modelName,
+      instanceId: instance.id,
+      at: new Date().toISOString()
     });
 
     return {

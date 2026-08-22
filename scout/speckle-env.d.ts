@@ -13,4 +13,9 @@ interface Env {
   SPECKLE_WEBHOOK_SECRET: string;
   /** Bearer token gating the /debug/* diagnostics. Unset disables them. */
   SCOUT_DEBUG_TOKEN: string;
+  /**
+   * Token required to write scouts through the API. Falls back to
+   * SCOUT_DEBUG_TOKEN when unset; with neither, writes are refused.
+   */
+  SCOUT_ADMIN_TOKEN: string;
 }

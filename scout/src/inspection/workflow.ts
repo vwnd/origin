@@ -9,7 +9,9 @@ import {
   versionUrl
 } from "../speckle/client";
 import { createLogger } from "../speckle/logging";
-import { loadEnabledInstructions } from "../instructions";
+import { loadEnabledScouts } from "../scouts/store";
+import { publishEvent } from "../api/events";
+import { updateRun } from "../api/runs";
 import { loadVersionIntoIndex } from "./loader";
 import { runInstruction } from "./inspect";
 import {
@@ -65,9 +67,12 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
     const logger = createLogger(crypto.randomUUID(), { projectId, versionId });
 
     // Own step so a malformed instruction fails loudly before we spend a load.
+    // Loaded from R2 so scouts can be edited in the UI without a redeploy.
+    // Ids only: bodies are large and would count against the 1 MiB step-result
+    // cap, so the inspect step re-reads them.
     const instructions = await step.do("load-instructions", async () => {
-      const enabled = loadEnabledInstructions();
-      if (enabled.length === 0) throw new Error("No enabled instructions");
+      const enabled = await loadEnabledScouts(this.env);
+      if (enabled.length === 0) throw new Error("No enabled scouts");
       return enabled.map((instruction) => instruction.id);
     });
 
@@ -120,6 +125,19 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
     });
 
     logger.info("index_complete", { ...load, model: version.modelName });
+    await updateRun(this.env, event.instanceId, {
+      status: "inspecting",
+      modelName: version.modelName,
+      indexedObjects: load.indexedObjects
+    });
+    await publishEvent(this.env, {
+      type: "run_progress",
+      instanceId: event.instanceId,
+      versionId,
+      step: "indexed",
+      detail: { objects: load.indexedObjects, model: version.modelName },
+      at: new Date().toISOString()
+    });
 
     const inspection = await step.do("inspect", async () => {
       if (!this.env.ANTHROPIC_API_KEY) {
@@ -132,11 +150,10 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
 
       const findings: Finding[] = [];
       let estimatedCostUsd = 0;
+      const scouts = await loadEnabledScouts(this.env);
 
       for (const instructionId of instructions) {
-        const instruction = loadEnabledInstructions().find(
-          (item) => item.id === instructionId
-        );
+        const instruction = scouts.find((item) => item.id === instructionId);
         if (!instruction) continue;
 
         const result = await runInstruction({
@@ -199,6 +216,23 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
     });
 
     if (novel.findings.length === 0) {
+      await updateRun(this.env, event.instanceId, {
+        status: "no_findings",
+        findings: 0,
+        deltas: 0,
+        costUsd: inspection.estimatedCostUsd,
+        finished: true
+      });
+      await publishEvent(this.env, {
+        type: "run_complete",
+        instanceId: event.instanceId,
+        versionId,
+        outcome: "no_new_findings",
+        findings: 0,
+        deltas: 0,
+        issueIdentifier: null,
+        at: new Date().toISOString()
+      });
       logger.info("run_complete", {
         outcome: "no_new_findings",
         totalFindings: inspection.findings.length,
@@ -265,6 +299,25 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
         attached: built.deltas.length,
         actionableFindings: built.actionableFindings
       };
+    });
+
+    await updateRun(this.env, event.instanceId, {
+      status: "complete",
+      findings: novel.findings.length,
+      deltas: meta.attached,
+      costUsd: inspection.estimatedCostUsd,
+      issueIdentifier: issue.identifier,
+      finished: true
+    });
+    await publishEvent(this.env, {
+      type: "run_complete",
+      instanceId: event.instanceId,
+      versionId,
+      outcome: "issue_created",
+      findings: novel.findings.length,
+      deltas: meta.attached,
+      issueIdentifier: issue.identifier,
+      at: new Date().toISOString()
     });
 
     logger.info("run_complete", {

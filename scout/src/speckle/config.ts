@@ -14,6 +14,15 @@
  */
 export const SPECKLE_SERVER_URL = "https://app.speckle.systems";
 
+/**
+ * The project the UI reads from.
+ *
+ * The webhook is project-scoped so the pipeline never needs this — it acts on
+ * whatever `payload.streamId` names. The UI does need a project to show, and
+ * this is it.
+ */
+export const SPECKLE_PROJECT_ID = "98e7569906";
+
 /** Path the Speckle webhook posts to. Configure this in Project → Settings → Webhooks. */
 export const SPECKLE_WEBHOOK_PATH = "/webhooks/speckle";
 

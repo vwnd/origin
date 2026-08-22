@@ -338,3 +338,70 @@ export async function createResourceMeta(
 
   return data.resourceMetaMutations.create;
 }
+
+const PROJECT_ISSUES = /* GraphQL */ `
+  query ScoutProjectIssues($projectId: String!, $limit: Int!) {
+    project(id: $projectId) {
+      issues(input: { limit: $limit }) {
+        totalCount
+        items {
+          id
+          identifier
+          title
+          status
+          priority
+          createdAt
+          updatedAt
+          rawDescription
+          author {
+            user {
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export type ProjectIssue = {
+  id: string;
+  identifier: string;
+  title: string | null;
+  status: string;
+  priority: string | null;
+  createdAt: string;
+  updatedAt: string;
+  rawDescription: string | null;
+  author: { user: { name: string | null } | null } | null;
+};
+
+/** Issues for the Inbox, newest first. */
+export async function listProjectIssues(
+  token: string,
+  projectId: string,
+  limit = 50
+): Promise<ProjectIssue[]> {
+  const data = await graphql<{
+    project: { issues: { items: ProjectIssue[] } } | null;
+  }>(token, PROJECT_ISSUES, { projectId, limit: Math.min(limit, 100) });
+  return data.project?.issues.items ?? [];
+}
+
+const WORKSPACE_ID = /* GraphQL */ `
+  query ScoutWorkspaceId($projectId: String!) {
+    project(id: $projectId) {
+      workspaceId
+    }
+  }
+`;
+
+export async function getWorkspaceId(
+  token: string,
+  projectId: string
+): Promise<string | null> {
+  const data = await graphql<{
+    project: { workspaceId: string | null } | null;
+  }>(token, WORKSPACE_ID, { projectId });
+  return data.project?.workspaceId ?? null;
+}

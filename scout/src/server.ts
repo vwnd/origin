@@ -15,8 +15,10 @@ import {
   isSpeckleWebhookRequest
 } from "./speckle/webhook";
 import { handleDebug, isDebugRequest } from "./inspection/debug";
+import { handleApi, isApiRequest } from "./api/routes";
 
 export { InspectionAgent } from "./inspection/agent";
+export { EventsAgent } from "./api/events";
 export { InspectionWorkflow } from "./inspection/workflow";
 
 export class ChatAgent extends AIChatAgent<Env> {
@@ -217,6 +219,11 @@ export default {
     // Speckle webhook deliveries land here before the agent router.
     if (isSpeckleWebhookRequest(request)) {
       return await handleSpeckleWebhook(request, env);
+    }
+
+    // JSON API behind the UI.
+    if (isApiRequest(request)) {
+      return await handleApi(request, env);
     }
 
     // Token-gated inspection diagnostics.

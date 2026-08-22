@@ -8,7 +8,7 @@
   "assets": {
     "directory": "./public",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/agents/*", "/oauth/*", "/webhooks/*", "/debug/*"]
+    "run_worker_first": ["/agents/*", "/oauth/*", "/webhooks/*", "/debug/*", "/api/*"]
   },
   "durable_objects": {
     "bindings": [
@@ -19,6 +19,10 @@
       {
         "class_name": "InspectionAgent",
         "name": "InspectionAgent"
+      },
+      {
+        "class_name": "EventsAgent",
+        "name": "EventsAgent"
       }
     ]
   },
@@ -30,6 +34,10 @@
     {
       "new_sqlite_classes": ["InspectionAgent"],
       "tag": "v2"
+    },
+    {
+      "new_sqlite_classes": ["EventsAgent"],
+      "tag": "v3"
     }
   ],
   // Streaming and parsing a large version is CPU-bound; the default 30s is not
@@ -44,6 +52,21 @@
       "name": "scout-inspection",
       "binding": "INSPECTION_WORKFLOW",
       "class_name": "InspectionWorkflow"
+    }
+  ],
+  // Scout instruction bodies live in R2 (markdown, edited in the UI) with their
+  // metadata in D1, so they can be changed without a redeploy.
+  "r2_buckets": [
+    {
+      "binding": "INSTRUCTIONS",
+      "bucket_name": "scout-instructions"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "scout-metadata",
+      "database_id": "fcdb26ec-e114-482b-85c2-c0cf5285f8da"
     }
   ],
   "observability": {
