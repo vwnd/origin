@@ -21,13 +21,13 @@ State the problem plainly, with an example of a value that is wrong and why.
 Be explicit about legitimate variation, so the scout does not report it.
 `;
 
-/** Green when the scout runs on each publish, grey when it is switched off. */
+/** Blue when the scout runs on each publish, grey when it is switched off. */
 function StatusDot({ active }: { active: boolean }) {
   return (
     <span
       className={cn(
         "size-2 shrink-0 rounded-full",
-        active ? "bg-emerald-500" : "bg-muted-foreground/40"
+        active ? "bg-primary" : "bg-muted-foreground/40"
       )}
       title={active ? "Active" : "Inactive"}
     />
@@ -168,7 +168,7 @@ export function Scouts() {
     <div className="space-y-4">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Scouts</h1>
+          <h1 className="font-serif text-3xl leading-none">Scouts</h1>
           <p className="text-sm text-muted-foreground">
             Each scout is an instruction run against every published version.
           </p>

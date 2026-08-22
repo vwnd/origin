@@ -19,10 +19,14 @@ import { EmptyState } from "@/components/empty-state";
 
 const SPECKLE_BASE = "https://app.speckle.systems";
 
+/*
+ * A ramp rather than a palette: settled work greys out, open work takes a
+ * tint, and anything waiting on a person takes the full blue.
+ */
 function statusVariant(status: string) {
   if (status === "resolved") return "success" as const;
-  if (status === "readyForReview") return "warning" as const;
-  return "outline" as const;
+  if (status === "readyForReview") return "default" as const;
+  return "warning" as const;
 }
 
 function relativeTime(iso: string): string {
@@ -36,8 +40,8 @@ function relativeTime(iso: string): string {
 }
 
 const SEVERITY_DOT: Record<ParsedFinding["severity"], string> = {
-  high: "bg-red-500",
-  medium: "bg-amber-500",
+  high: "bg-destructive",
+  medium: "bg-primary",
   low: "bg-muted-foreground/40"
 };
 
@@ -91,7 +95,7 @@ function FindingList({ findings }: { findings: ParsedFinding[] }) {
               ))}
 
               {finding.suggestion ? (
-                <span className="text-emerald-600">{finding.suggestion}</span>
+                <span className="text-primary">{finding.suggestion}</span>
               ) : null}
             </div>
           </div>
@@ -134,7 +138,7 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
     <div className="space-y-4">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Inbox</h1>
+          <h1 className="font-serif text-3xl leading-none">Inbox</h1>
           <p className="text-sm text-muted-foreground">
             Issues Scout has filed on this project.
           </p>

@@ -103,7 +103,7 @@ export function Analytics({ refreshKey }: { refreshKey: number }) {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">Analytics</h1>
+        <h1 className="font-serif text-3xl leading-none">Analytics</h1>
         <p className="text-sm text-muted-foreground">
           Inspection runs, updated live while one is in flight.
         </p>
@@ -123,9 +123,7 @@ export function Analytics({ refreshKey }: { refreshKey: number }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-semibold tabular-nums">
-                {stat.value}
-              </p>
+              <p className="font-serif text-3xl tabular-nums">{stat.value}</p>
             </CardContent>
           </Card>
         ))}
@@ -171,7 +169,7 @@ export function Analytics({ refreshKey }: { refreshKey: number }) {
                   >
                     {run.modelName ?? "—"}
                     {run.error ? (
-                      <span className="ml-2 text-xs text-red-500">
+                      <span className="ml-2 text-xs text-destructive">
                         {run.error.slice(0, 60)}
                       </span>
                     ) : null}

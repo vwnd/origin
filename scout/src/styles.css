@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/geist-mono";
 
 /*
  * Dark mode follows an explicit `.dark` class rather than only the OS setting,
@@ -21,55 +23,60 @@
  * exist as real utilities.
  */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /*
+   * Paper, ink and one blue — the landing page's palette, promoted to the
+   * whole app so a card, a table row and the plate all belong to one sheet.
+   * Square corners throughout: the only curve in this design is the lens.
+   */
+  --radius: 0rem;
+  --background: #ebe8e1;
+  --foreground: #16181c;
+  --card: #f3f1eb;
+  --card-foreground: #16181c;
+  --popover: #f3f1eb;
+  --popover-foreground: #16181c;
+  --primary: #2323e6;
+  --primary-foreground: #ebe8e1;
+  --secondary: #e1ded5;
+  --secondary-foreground: #16181c;
+  --muted: #e3e0d7;
+  --muted-foreground: #6c7077;
+  --accent: #dedad0;
+  --accent-foreground: #16181c;
+  --destructive: #b8352a;
+  --destructive-foreground: #ebe8e1;
+  --border: rgba(22, 24, 28, 0.14);
+  --input: rgba(22, 24, 28, 0.22);
+  --ring: #2323e6;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: #16181c;
+  --foreground: #ebe8e1;
+  --card: #1d2026;
+  --card-foreground: #ebe8e1;
+  --popover: #1d2026;
+  --popover-foreground: #ebe8e1;
+  --primary: #6b6bff;
+  --primary-foreground: #16181c;
+  --secondary: #24272e;
+  --secondary-foreground: #ebe8e1;
+  --muted: #24272e;
+  --muted-foreground: #9aa0a8;
+  --accent: #2a2e36;
+  --accent-foreground: #ebe8e1;
+  --destructive: #e0685c;
+  --destructive-foreground: #16181c;
+  --border: rgba(235, 232, 225, 0.14);
+  --input: rgba(235, 232, 225, 0.2);
+  --ring: #6b6bff;
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -90,6 +97,8 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", monospace;
 }
 
 html,
@@ -126,4 +135,291 @@ body,
 .w-md-editor-toolbar {
   background-color: var(--muted);
   border-bottom: 1px solid var(--border);
+}
+
+/*
+ * Landing page.
+ *
+ * A briefing sheet: a plate, a caption, a statement set large, a note in the
+ * margin. Set outside the shadcn token system on purpose — it has its own
+ * paper, its own ink, and one blue. Square corners throughout; the only curve
+ * on the page is the lens inside the plate.
+ */
+.origo-paper,
+.origo-paper body {
+  background-color: #ebe8e1;
+  overflow: hidden;
+  color-scheme: light;
+}
+
+.origo-sheet {
+  --paper: #ebe8e1;
+  --ink: #16181c;
+  --blue: #2323e6;
+  --muted: #6c7077;
+  --serif: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", monospace;
+
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 21rem);
+  gap: clamp(1.5rem, 3vw, 3.5rem);
+  padding: clamp(1.25rem, 2.4vw, 2.25rem);
+  overflow: hidden;
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+/*
+ * The plate covers the whole column and is notched out at the bottom left, so
+ * the caption and statement sit in paper with the blue still running down
+ * beside them. That asymmetry is the composition — without it this is a box.
+ */
+.origo-plate-column {
+  position: relative;
+  min-height: 0;
+}
+
+.origo-plate {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 63% 100%, 63% 62%, 0 62%);
+}
+
+.origo-wordmark {
+  position: absolute;
+  top: clamp(0.75rem, 1.8vw, 1.75rem);
+  left: clamp(0.875rem, 1.8vw, 1.75rem);
+  font-family: var(--serif);
+  font-size: clamp(1.75rem, 3.2vw, 3rem);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--paper);
+}
+
+.origo-foot {
+  position: absolute;
+  top: 62%;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: 60%;
+  flex-direction: column;
+  padding-top: clamp(0.875rem, 2vh, 1.5rem);
+}
+
+.origo-caption {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  line-height: 1.7;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.origo-statement {
+  margin-top: auto;
+  margin-bottom: clamp(1rem, 2.2vh, 1.75rem);
+  font-family: var(--serif);
+  font-size: clamp(1.5rem, 2.9vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+}
+
+/* Two lines are reserved, so the button never moves as the statement changes. */
+.origo-statement-box {
+  display: block;
+  min-height: 2.28em;
+}
+
+.origo-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  align-self: flex-start;
+  background-color: var(--blue);
+  padding: 0.75rem 1.125rem 0.75rem 1.375rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--paper);
+  transition:
+    background-color 240ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.origo-cta:hover {
+  background-color: var(--ink);
+}
+
+.origo-cta:active {
+  transform: translateY(1px);
+  transition-duration: 90ms;
+}
+
+.origo-cta:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.origo-cta svg {
+  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.origo-cta:hover svg {
+  transform: translateX(3px);
+}
+
+.origo-margin {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.origo-lede {
+  font-family: var(--serif);
+  font-size: clamp(1.15rem, 1.65vw, 1.65rem);
+  font-weight: 400;
+  line-height: 1.18;
+  color: var(--blue);
+}
+
+/*
+ * Origo does not stop at telling you what is wrong, so the word "reviews" gets
+ * struck out in front of the reader rather than arriving pre-cancelled.
+ */
+.origo-strike {
+  position: relative;
+  white-space: nowrap;
+}
+
+.origo-strike::after {
+  content: "";
+  position: absolute;
+  top: 0.56em;
+  right: -0.05em;
+  left: -0.05em;
+  height: 1px;
+  background-color: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: origo-draw 420ms cubic-bezier(0.4, 0, 0.2, 1) 1700ms both;
+}
+
+.origo-margin-foot {
+  margin-top: auto;
+}
+
+.origo-rule {
+  border: 0;
+  border-top: 1px solid rgba(22, 24, 28, 0.18);
+}
+
+.origo-note {
+  max-width: 22rem;
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.origo-mark {
+  display: flex;
+  margin-top: clamp(1rem, 3vh, 2rem);
+  justify-content: flex-end;
+}
+
+/*
+ * The entrance: the plate draws itself, then everything set on paper arrives
+ * on a beat behind it. One easing curve throughout, nothing overshoots.
+ */
+@keyframes origo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes origo-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.origo-in {
+  animation: origo-rise 560ms cubic-bezier(0.4, 0, 0.2, 1)
+    var(--origo-delay, 0ms) both;
+}
+
+.origo-rule.origo-in {
+  transform-origin: left;
+  animation-name: origo-draw;
+  animation-duration: 640ms;
+}
+
+@media (max-width: 900px) {
+  .origo-paper,
+  .origo-paper body {
+    overflow: auto;
+  }
+
+  .origo-sheet {
+    position: static;
+    min-height: 100dvh;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .origo-plate-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* No room for the notch on a phone, so the plate goes back to a rectangle. */
+  .origo-plate {
+    position: relative;
+    inset: auto;
+    aspect-ratio: 4 / 3;
+    clip-path: none;
+  }
+
+  .origo-foot {
+    position: static;
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .origo-statement {
+    margin-top: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .origo-in {
+    animation: none;
+  }
+
+  .origo-strike::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+
+  .origo-cta,
+  .origo-cta svg {
+    transition: none;
+  }
+
+  .origo-cta:hover svg {
+    transform: none;
+  }
 }

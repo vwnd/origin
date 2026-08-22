@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import {
+  Link,
   NavLink,
   Navigate,
   Route,
@@ -7,17 +8,17 @@ import {
   Routes
 } from "react-router-dom";
 import { Toaster, toast } from "sonner";
-import { BarChart3, Inbox as InboxIcon, Radar, Radio } from "lucide-react";
 import { useScoutEvents, type ScoutEvent } from "@/lib/events";
 import { cn } from "@/lib/utils";
 import { Inbox } from "@/pages/Inbox";
 import { Scouts } from "@/pages/Scouts";
 import { Analytics } from "@/pages/Analytics";
+import { Landing } from "@/pages/Landing";
 
 const NAV = [
-  { to: "/inbox", label: "Inbox", icon: InboxIcon },
-  { to: "/scouts", label: "Scouts", icon: Radar },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 }
+  { to: "/inbox", label: "Inbox" },
+  { to: "/scouts", label: "Scouts" },
+  { to: "/analytics", label: "Analytics" }
 ];
 
 function Shell() {
@@ -68,55 +69,56 @@ function Shell() {
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
-          <span className="flex items-center gap-2 font-semibold tracking-tight">
-            <Radar className="size-5" />
+      {/*
+       * The masthead of the same sheet the landing page is printed on: serif
+       * wordmark, mono nav, one hairline. Nothing here is a pill or a chip.
+       */}
+      <header className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-baseline gap-8 px-6 py-3.5">
+          <Link to="/" className="font-serif text-2xl leading-none">
             Origo
-          </span>
+          </Link>
 
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-baseline gap-6">
             {NAV.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
+                    "border-b pb-0.5 font-mono text-[0.6875rem] tracking-[0.12em] uppercase transition-colors",
                     isActive
-                      ? "bg-accent font-medium text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   )
                 }
               >
-                <item.icon className="size-4" />
                 {item.label}
               </NavLink>
             ))}
           </nav>
 
           <span
-            className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground"
+            className="ml-auto flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.12em] text-muted-foreground uppercase"
             title={
               connected
                 ? "Receiving live pipeline events"
                 : "Reconnecting to the event stream"
             }
           >
-            <Radio
+            <span
               className={cn(
-                "size-3.5",
-                connected ? "text-emerald-500" : "text-muted-foreground"
+                "size-1.5 rounded-full",
+                connected ? "bg-primary" : "bg-muted-foreground/40"
               )}
             />
-            {connected ? "live" : "offline"}
+            {connected ? "Live" : "Offline"}
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-6">
         <Routes>
-          <Route path="/" element={<Navigate to="/inbox" replace />} />
           <Route path="/inbox" element={<Inbox refreshKey={refreshKey} />} />
           <Route path="/scouts" element={<Scouts />} />
           <Route
@@ -135,7 +137,12 @@ function Shell() {
 export default function App() {
   return (
     <Router>
-      <Shell />
+      <Routes>
+        {/* The landing page is deliberately outside the shell: no header, no
+            event socket, nothing but the way in. */}
+        <Route path="/" element={<Landing />} />
+        <Route path="*" element={<Shell />} />
+      </Routes>
     </Router>
   );
 }
