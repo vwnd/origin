@@ -268,6 +268,108 @@ export class InspectionAgent extends Agent<Env> {
       .toArray();
   }
 
+  /**
+   * Parameters worth asking a model about, chosen in SQL rather than by the
+   * model itself.
+   *
+   * This is the whole cost story: candidate selection is a deterministic query,
+   * so it costs nothing, and each parameter can then be judged by a small
+   * independent request instead of one long conversation that re-reads its own
+   * history every turn.
+   *
+   * The filter encodes what "enum-like" means — the shape in which a one-off
+   * misspelling is detectable:
+   *  - enough objects that a majority exists to compare against
+   *  - at least two distinct values, or there is nothing to compare
+   *  - few enough distinct values that it is a vocabulary, not an identifier
+   *  - no numeric values, since areas and lengths vary by design
+   *  - a low distinct-to-object ratio, which excludes marks and room names
+   */
+  async listCandidateParameters(
+    options: {
+      minObjects?: number;
+      maxDistinct?: number;
+      maxDistinctRatio?: number;
+      limit?: number;
+    } = {}
+  ): Promise<
+    { keyPath: string; name: string; objects: number; distinctValues: number }[]
+  > {
+    this.ensureTables();
+    const minObjects = options.minObjects ?? 5;
+    // Generous: name-like parameters (Type Name, Description) are legitimately
+    // high-cardinality, and that is exactly where misspellings hide. Tightening
+    // this to enum-like counts excluded three of the first run's seven findings.
+    // The histogram sent per parameter is capped separately instead.
+    const maxDistinct = options.maxDistinct ?? 200;
+    const maxDistinctRatio = options.maxDistinctRatio ?? 0.6;
+    const limit = Math.min(options.limit ?? 250, 500);
+
+    return this.db
+      .exec<{
+        keyPath: string;
+        name: string;
+        objects: number;
+        distinctValues: number;
+      }>(
+        "SELECT key_path AS keyPath, name AS name," +
+          " COUNT(DISTINCT object_id) AS objects," +
+          " COUNT(DISTINCT value_text) AS distinctValues" +
+          " FROM properties GROUP BY key_path, name" +
+          " HAVING objects >= ? AND distinctValues >= 2 AND distinctValues <= ?" +
+          " AND SUM(CASE WHEN value_num IS NOT NULL THEN 1 ELSE 0 END) = 0" +
+          " AND (distinctValues * 1.0 / objects) <= ?" +
+          " ORDER BY objects DESC LIMIT ?;",
+        minObjects,
+        maxDistinct,
+        maxDistinctRatio,
+        limit
+      )
+      .toArray();
+  }
+
+  /**
+   * Histograms for a set of parameters in one round trip, so judging N
+   * parameters does not mean N+1 calls into this object.
+   */
+  async histogramsFor(
+    keyPaths: string[],
+    valuesPerKey = 40
+  ): Promise<Record<string, ValueCount[]>> {
+    this.ensureTables();
+    if (keyPaths.length === 0) return {};
+
+    const out: Record<string, ValueCount[]> = {};
+    // Chunked to stay under the 100 bound-parameter cap.
+    for (let i = 0; i < keyPaths.length; i += 90) {
+      const chunk = keyPaths.slice(i, i + 90);
+      const placeholders = chunk.map(() => "?").join(",");
+      const rows = this.db
+        .exec<{
+          keyPath: string;
+          value: string | null;
+          count: number;
+          units: string | null;
+        }>(
+          "SELECT key_path AS keyPath, value_text AS value, COUNT(*) AS count," +
+            " MAX(units) AS units FROM properties WHERE key_path IN (" +
+            placeholders +
+            ") GROUP BY key_path, value_text ORDER BY count DESC;",
+          ...chunk
+        )
+        .toArray();
+
+      for (const row of rows) {
+        const bucket = (out[row.keyPath] ??= []);
+        if (bucket.length < valuesPerKey) {
+          bucket.push({ value: row.value, count: row.count, units: row.units });
+        }
+      }
+    }
+
+    return out;
+  }
+
   /** Drill-down: a few concrete objects carrying a given value. */
   async sampleObjects(options: {
     keyPath?: string;

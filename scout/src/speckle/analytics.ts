@@ -19,7 +19,9 @@ export type DeliveryOutcome =
   | "bad_request" // unparseable body or payload
   | "ignored_event" // event we do not act on
   | "ignored_payload" // right event, but missing fields we need
-  | "speckle_error"; // Speckle rejected the issue creation
+  | "speckle_error" // Speckle rejected the request
+  | "run_started" // inspection pipeline handed off to the workflow
+  | "run_failed"; // could not start the pipeline
 
 export type DeliveryMetrics = {
   outcome: DeliveryOutcome;

@@ -203,3 +203,68 @@ export async function getVersionInfo(
     version: data.project?.version ?? null
   };
 }
+
+const OPEN_ISSUES = /* GraphQL */ `
+  query ScoutOpenIssues($projectId: String!, $limit: Int!, $cursor: String) {
+    project(id: $projectId) {
+      issues(
+        input: {
+          statuses: [open, readyForReview]
+          limit: $limit
+          cursor: $cursor
+        }
+      ) {
+        totalCount
+        cursor
+        items {
+          id
+          identifier
+          title
+          rawDescription
+        }
+      }
+    }
+  }
+`;
+
+export type OpenIssue = {
+  id: string;
+  identifier: string;
+  title: string | null;
+  rawDescription: string | null;
+};
+
+/**
+ * Issues still open on the project, used to avoid filing a problem twice.
+ *
+ * Only unresolved statuses are fetched: once someone resolves a Scout issue,
+ * the same finding on a later version should be reportable again rather than
+ * silently suppressed forever.
+ */
+export async function listOpenIssues(
+  token: string,
+  projectId: string,
+  maxPages = 5
+): Promise<OpenIssue[]> {
+  const issues: OpenIssue[] = [];
+  let cursor: string | null = null;
+
+  for (let page = 0; page < maxPages; page++) {
+    const data: {
+      project: {
+        issues: {
+          cursor: string | null;
+          items: OpenIssue[];
+        };
+      } | null;
+    } = await graphql(token, OPEN_ISSUES, { projectId, limit: 100, cursor });
+
+    const collection = data.project?.issues;
+    if (!collection) break;
+    issues.push(...collection.items);
+    if (!collection.cursor || collection.items.length === 0) break;
+    cursor = collection.cursor;
+  }
+
+  return issues;
+}

@@ -2,7 +2,7 @@ import { SPECKLE_SERVER_URL } from "../speckle/config";
 import { getVersionInfo } from "../speckle/client";
 import { timingSafeEqualStrings } from "../speckle/signature";
 import { createLogger, errorMessage } from "../speckle/logging";
-import { runIndex, runQuery } from "./index-route";
+import { runFileIssue, runIndex, runInspect, runQuery } from "./index-route";
 
 /**
  * Token-gated diagnostics for the inspection pipeline.
@@ -62,6 +62,10 @@ export async function handleDebug(
         return await runIndex(url, env);
       case "query":
         return await runQuery(url, env);
+      case "inspect":
+        return await runInspect(url, env);
+      case "file-issue":
+        return await runFileIssue(request, url, env);
       default:
         return Response.json({ error: "Unknown debug route" }, { status: 404 });
     }

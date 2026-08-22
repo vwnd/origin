@@ -1,11 +1,9 @@
 import { SPECKLE_WEBHOOK_PATH, VERSION_CREATED_EVENT } from "./config";
-import { createIssue, versionUrl } from "./client";
 import { SIGNATURE_HEADER, verifySignature } from "./signature";
 import {
   describeEventData,
   parseWebhookEnvelope,
-  toPublishedVersion,
-  type PublishedVersion
+  toPublishedVersion
 } from "./types";
 import { recordDelivery, type DeliveryMetrics } from "./analytics";
 import { createLogger, errorMessage, type Logger } from "./logging";
@@ -185,48 +183,34 @@ async function processDelivery(
     sourceApplication: version.sourceApplication
   };
 
+  // Hand off to the durable pipeline and acknowledge immediately. Indexing a
+  // version takes minutes, which is far longer than Speckle will wait — and it
+  // retries anything that is not 2xx, so the slow path must not sit in the
+  // request.
   try {
-    const issue = await createIssue(env.SPECKLE_TOKEN, {
-      projectId: version.projectId,
-      title: "hello world",
-      description: helloWorldDescription(version)
-      // No `anchor`: pinning an issue to the version needs a viewerState and a
-      // screenshot alongside the resource id, and we have neither here. The
-      // description carries a link to the version instead.
+    const instance = await env.INSPECTION_WORKFLOW.create({
+      params: { projectId: version.projectId, versionId: version.versionId }
     });
 
-    logger.info("issue_created", {
-      issueId: issue.id,
-      issueIdentifier: issue.identifier,
-      issueNumber: issue.number
+    logger.info("inspection_started", {
+      instanceId: instance.id,
+      ...versionFields
     });
 
     return {
-      status: 201,
-      body: { created: issue.identifier, issueId: issue.id },
-      outcome: "issue_created",
-      issueIdentifier: issue.identifier,
+      status: 202,
+      body: { started: true, workflowInstanceId: instance.id },
+      outcome: "run_started",
       ...versionFields
     };
   } catch (error) {
-    logger.error("issue_creation_failed", { error: errorMessage(error) });
+    logger.error("inspection_start_failed", { error: errorMessage(error) });
     return {
       status: 502,
-      body: { error: "Failed to create Speckle issue" },
-      outcome: "speckle_error",
+      body: { error: "Failed to start inspection" },
+      outcome: "run_failed",
       error: errorMessage(error),
       ...versionFields
     };
   }
-}
-
-/** Placeholder body — proves the pipeline end to end before Scout does real work. */
-function helloWorldDescription(version: PublishedVersion): string {
-  const from = version.sourceApplication ?? "unknown source";
-  const by = version.authorName ?? "unknown author";
-  const model = version.modelName ?? version.modelId ?? "unknown model";
-  const link = version.modelId
-    ? ` ${versionUrl(version.projectId, version.modelId, version.versionId)}`
-    : "";
-  return `hello world — new version ${version.versionId} on model ${model} (published from ${from} by ${by}).${link}`;
 }
