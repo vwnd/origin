@@ -1,21 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Activity, CheckCircle2, CircleAlert, Loader2 } from "lucide-react";
 import { api, type RunRecord } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  EmptyState,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow
-} from "@/components/ui/primitives";
+} from "@/components/ui/table";
+import { EmptyState } from "@/components/empty-state";
 
 /** Polled only while something is in flight; live events cover the rest. */
 const ACTIVE_POLL_MS = 3000;
@@ -42,7 +39,7 @@ function statusBadge(status: string) {
   }
   if (status === "no_findings") return <Badge variant="secondary">clean</Badge>;
   return (
-    <Badge variant="danger" className="gap-1">
+    <Badge variant="destructive" className="gap-1">
       <CircleAlert className="size-3" />
       {status}
     </Badge>

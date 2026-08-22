@@ -1,6 +1,10 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "jsx-a11y", "typescript"],
+  "plugins": [
+    "react",
+    "jsx-a11y",
+    "typescript"
+  ],
   "categories": {
     "correctness": "error"
   },
@@ -17,5 +21,8 @@
       }
     ]
   },
-  "ignorePatterns": ["**/env.d.ts"]
+  "ignorePatterns": [
+    "**/env.d.ts",
+    "src/components/ui/**"
+  ]
 }

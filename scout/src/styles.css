@@ -1,8 +1,96 @@
 @import "tailwindcss";
-@import "@cloudflare/kumo/styles/tailwind";
-@source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
-@source "../node_modules/streamdown/dist/*.js";
-@source "../node_modules/@streamdown/code/dist/*.js";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+
+/*
+ * Dark mode follows an explicit `.dark` class rather than only the OS setting,
+ * so a future toggle works without restructuring the tokens.
+ */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * shadcn design tokens.
+ *
+ * Declared here rather than imported: the `shadcn` package is the CLI and ships
+ * no stylesheet, so the `@import "shadcn/tailwind.css"` the init writes
+ * resolves to nothing and every `border-border`-style utility fails to build.
+ *
+ * Two layers, which is the Tailwind v4 shape. Raw values live on `:root` and
+ * `.dark` so a theme swap only rewrites this block; `@theme inline` then
+ * exposes them to Tailwind so `bg-background`, `border-border` and friends
+ * exist as real utilities.
+ */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+}
 
 html,
 body,
@@ -12,54 +100,30 @@ body,
   margin: 0;
 }
 
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
 /*
- * shadcn design tokens.
- *
- * Defined on :root and re-declared under .dark rather than only inside a media
- * query, so the theme follows an explicit choice as well as the OS setting.
+ * The markdown editor ships its own palette. Map the surfaces it exposes onto
+ * the shadcn tokens so it does not sit in the page as a lighter rectangle.
  */
-@theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(240 10% 3.9%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(240 10% 3.9%);
-  --color-primary: hsl(240 5.9% 10%);
-  --color-primary-foreground: hsl(0 0% 98%);
-  --color-secondary: hsl(240 4.8% 95.9%);
-  --color-secondary-foreground: hsl(240 5.9% 10%);
-  --color-muted: hsl(240 4.8% 95.9%);
-  --color-muted-foreground: hsl(240 3.8% 46.1%);
-  --color-accent: hsl(240 4.8% 95.9%);
-  --color-accent-foreground: hsl(240 5.9% 10%);
-  --color-destructive: hsl(0 72% 51%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(240 5.9% 90%);
-  --color-input: hsl(240 5.9% 90%);
-  --color-ring: hsl(240 5.9% 10%);
-  --radius-lg: 0.5rem;
+.w-md-editor {
+  --color-canvas-default: var(--background);
+  --color-fg-default: var(--foreground);
+  --color-border-default: var(--border);
+  background-color: var(--background);
+  color: var(--foreground);
+  box-shadow: none;
 }
 
-.dark {
-  --color-background: hsl(240 10% 3.9%);
-  --color-foreground: hsl(0 0% 98%);
-  --color-card: hsl(240 10% 5.9%);
-  --color-card-foreground: hsl(0 0% 98%);
-  --color-primary: hsl(0 0% 98%);
-  --color-primary-foreground: hsl(240 5.9% 10%);
-  --color-secondary: hsl(240 3.7% 15.9%);
-  --color-secondary-foreground: hsl(0 0% 98%);
-  --color-muted: hsl(240 3.7% 15.9%);
-  --color-muted-foreground: hsl(240 5% 64.9%);
-  --color-accent: hsl(240 3.7% 15.9%);
-  --color-accent-foreground: hsl(0 0% 98%);
-  --color-destructive: hsl(0 62.8% 45%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(240 3.7% 15.9%);
-  --color-input: hsl(240 3.7% 15.9%);
-  --color-ring: hsl(240 4.9% 83.9%);
-}
-
-body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+.w-md-editor-toolbar {
+  background-color: var(--muted);
+  border-bottom: 1px solid var(--border);
 }

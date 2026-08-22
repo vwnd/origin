@@ -9,13 +9,11 @@ import {
   type Scout,
   type ScoutMeta
 } from "@/lib/api";
-import {
-  Button,
-  Card,
-  EmptyState,
-  Input,
-  Skeleton
-} from "@/components/ui/primitives";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 
 const NEW_SCOUT_BODY = `Describe what this scout should look for.

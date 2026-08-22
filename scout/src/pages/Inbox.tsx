@@ -3,19 +3,19 @@ import { ArrowUpRight, ChevronRight, RefreshCw } from "lucide-react";
 import { api, type Issue } from "@/lib/api";
 import { parseFindings, type ParsedFinding } from "@/lib/findings";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow
-} from "@/components/ui/primitives";
+} from "@/components/ui/table";
+import { EmptyState } from "@/components/empty-state";
 
 const SPECKLE_BASE = "https://app.speckle.systems";
 

@@ -1,0 +1,3 @@
+- At every milestone or feature completion, commit your changes with a clear and descriptive message.
+- Use semantic commit messages to clearly indicate the type of change, such as `feat` for new features, `fix` for bug fixes, and `docs` for documentation updates.
+- Prefix your commit messages with the appropriate type and scope, if applicable, to provide additional context. For example: `feat(auth): add login functionality`.
