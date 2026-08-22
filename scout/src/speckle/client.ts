@@ -148,3 +148,58 @@ export async function createIssue(
 
   return data.projectMutations.issues.createIssue;
 }
+
+const VERSION_INFO = /* GraphQL */ `
+  query ScoutVersionInfo($projectId: String!, $versionId: String!) {
+    project(id: $projectId) {
+      id
+      name
+      version(id: $versionId) {
+        id
+        referencedObject
+        schemaVersion
+        packfileSize
+        totalChildrenCount
+        sourceApplication
+        createdAt
+        model {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
+
+export type VersionInfo = {
+  id: string;
+  /** Root object id — the entry point for loading the object graph. */
+  referencedObject: string | null;
+  /**
+   * Storage generation. `null` => legacy single-packfile / PG-object version.
+   * `3` => v2 three-artefact parquet bundle (presigned /v2 artefacts endpoint).
+   * Decides which loader can read this version.
+   */
+  schemaVersion: number | null;
+  packfileSize: string | null;
+  totalChildrenCount: number | null;
+  sourceApplication: string | null;
+  createdAt: string;
+  model: { id: string; name: string } | null;
+};
+
+/** Metadata needed to decide how (and how much) to load. */
+export async function getVersionInfo(
+  token: string,
+  projectId: string,
+  versionId: string
+): Promise<{ projectName: string | null; version: VersionInfo | null }> {
+  const data = await graphql<{
+    project: { name: string | null; version: VersionInfo | null } | null;
+  }>(token, VERSION_INFO, { projectId, versionId });
+
+  return {
+    projectName: data.project?.name ?? null,
+    version: data.project?.version ?? null
+  };
+}

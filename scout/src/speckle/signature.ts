@@ -53,3 +53,28 @@ export async function verifySignature({
     encoder.encode(rawBody)
   );
 }
+
+/**
+ * Constant-time string comparison for shared secrets.
+ *
+ * Both sides are hashed to a fixed 32 bytes first, so the comparison length is
+ * constant and the length of the expected secret cannot leak. The XOR-accumulate
+ * loop always runs the full digest — no early exit on first mismatch.
+ */
+export async function timingSafeEqualStrings(
+  a: string,
+  b: string
+): Promise<boolean> {
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(a)),
+    crypto.subtle.digest("SHA-256", encoder.encode(b))
+  ]);
+
+  const bytesA = new Uint8Array(digestA);
+  const bytesB = new Uint8Array(digestB);
+  let diff = 0;
+  for (let i = 0; i < bytesA.length; i++) {
+    diff |= bytesA[i] ^ bytesB[i];
+  }
+  return diff === 0;
+}

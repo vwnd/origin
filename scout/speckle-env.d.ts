@@ -11,4 +11,6 @@ interface Env {
   SPECKLE_TOKEN: string;
   /** Shared secret configured on the Speckle project webhook. */
   SPECKLE_WEBHOOK_SECRET: string;
+  /** Bearer token gating the /debug/* diagnostics. Unset disables them. */
+  SCOUT_DEBUG_TOKEN: string;
 }
