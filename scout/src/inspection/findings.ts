@@ -8,6 +8,12 @@ export type Severity = "high" | "medium" | "low";
 export type Evidence = {
   value: string;
   count: number;
+  /**
+   * The exact replacement, when the model could determine one. Present means
+   * the finding can be turned into write-back deltas; null means it is
+   * reportable but not automatically fixable.
+   */
+  correctedValue?: string | null;
 };
 
 export type Finding = {

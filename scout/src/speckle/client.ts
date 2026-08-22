@@ -154,6 +154,7 @@ const VERSION_INFO = /* GraphQL */ `
     project(id: $projectId) {
       id
       name
+      workspaceId
       version(id: $versionId) {
         id
         referencedObject
@@ -193,13 +194,23 @@ export async function getVersionInfo(
   token: string,
   projectId: string,
   versionId: string
-): Promise<{ projectName: string | null; version: VersionInfo | null }> {
+): Promise<{
+  projectName: string | null;
+  /** Required by the resource-meta mutation. */
+  workspaceId: string | null;
+  version: VersionInfo | null;
+}> {
   const data = await graphql<{
-    project: { name: string | null; version: VersionInfo | null } | null;
+    project: {
+      name: string | null;
+      workspaceId: string | null;
+      version: VersionInfo | null;
+    } | null;
   }>(token, VERSION_INFO, { projectId, versionId });
 
   return {
     projectName: data.project?.name ?? null,
+    workspaceId: data.project?.workspaceId ?? null,
     version: data.project?.version ?? null
   };
 }
@@ -267,4 +278,63 @@ export async function listOpenIssues(
   }
 
   return issues;
+}
+
+const CREATE_RESOURCE_META = /* GraphQL */ `
+  mutation ScoutCreateResourceMeta($input: CreateResourceMetaInput!) {
+    resourceMetaMutations {
+      create(input: $input) {
+        id
+      }
+    }
+  }
+`;
+
+/**
+ * One proposed parameter edit on one object, in the shape Speckle's parameter
+ * updater writes.
+ *
+ * `path` is rooted at the object (`properties.…`) and
+ * `internalDefinitionName` is Revit's stable handle for the parameter — both
+ * are what make the change addressable rather than merely described.
+ */
+export type ObjectDelta = {
+  id: string;
+  applicationId: string;
+  path: string;
+  from: string;
+  to: string;
+  internalDefinitionName: string;
+};
+
+/**
+ * Attach proposed edits to an issue as `objectDeltas` resource metadata.
+ *
+ * This is what turns a finding from a description into something actionable:
+ * the same metadata shape Speckle's own parameter updater produces, so the
+ * viewer can offer the edits for review and bulk application.
+ */
+export async function createResourceMeta(
+  token: string,
+  input: {
+    projectId: string;
+    workspaceId: string;
+    issueId: string;
+    changes: ObjectDelta[];
+  }
+): Promise<{ id: string }> {
+  const data = await graphql<{
+    resourceMetaMutations: { create: { id: string } };
+  }>(token, CREATE_RESOURCE_META, {
+    input: {
+      data: { version: 1, changes: input.changes },
+      metaType: "objectDeltas",
+      projectId: input.projectId,
+      resourceId: input.issueId,
+      resourceType: "issue",
+      workspaceId: input.workspaceId
+    }
+  });
+
+  return data.resourceMetaMutations.create;
 }

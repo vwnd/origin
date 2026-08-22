@@ -3,6 +3,7 @@ import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { getAgentByName } from "agents";
 import {
   createIssue,
+  createResourceMeta,
   getVersionInfo,
   listOpenIssues,
   versionUrl
@@ -18,6 +19,7 @@ import {
   renderSummaryIssue,
   type Finding
 } from "./findings";
+import { buildDeltas } from "./deltas";
 import type { InspectionAgent } from "./agent";
 
 /**
@@ -73,7 +75,9 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
         rootObjectId: found.referencedObject,
         modelId: found.model?.id ?? null,
         modelName: found.model?.name ?? null,
-        totalChildrenCount: found.totalChildrenCount
+        totalChildrenCount: found.totalChildrenCount,
+        // Required by the resource-meta mutation that attaches the deltas.
+        workspaceId: info.workspaceId
       };
     });
 
@@ -207,10 +211,44 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
       return { identifier: created.identifier, id: created.id };
     });
 
+    // Attach the proposed edits, mirroring Speckle's parameter updater, so the
+    // issue carries fixes to review rather than only a description of what is
+    // wrong. Non-fatal: the issue is already filed and useful without it.
+    const meta = await step.do("attach-deltas", async () => {
+      if (!version.workspaceId) {
+        logger.warn("deltas_skipped", { reason: "no workspaceId" });
+        return { attached: 0 };
+      }
+
+      const agent = await getAgentByName<Env, InspectionAgent>(
+        this.env.InspectionAgent,
+        versionId
+      );
+      const built = await buildDeltas({
+        findings: novel.findings,
+        agent,
+        logger
+      });
+      if (built.deltas.length === 0) return { attached: 0 };
+
+      await createResourceMeta(this.env.SPECKLE_TOKEN, {
+        projectId,
+        workspaceId: version.workspaceId,
+        issueId: issue.id,
+        changes: built.deltas
+      });
+
+      return {
+        attached: built.deltas.length,
+        actionableFindings: built.actionableFindings
+      };
+    });
+
     logger.info("run_complete", {
       outcome: "issue_created",
       issue: issue.identifier,
       findings: novel.findings.length,
+      deltasAttached: meta.attached,
       estimatedCostUsd: inspection.estimatedCostUsd
     });
 
@@ -218,6 +256,7 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
       outcome: "issue_created" as const,
       issue,
       findings: novel.findings.length,
+      deltas: meta.attached,
       load
     };
   }

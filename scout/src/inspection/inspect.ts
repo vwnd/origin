@@ -115,7 +115,11 @@ type Judgement = {
   verdict?: "ok" | "issue";
   severity?: Severity;
   summary?: string;
-  suspectValues?: { value?: unknown; count?: unknown }[];
+  suspectValues?: {
+    value?: unknown;
+    count?: unknown;
+    correctedValue?: unknown;
+  }[];
   suggestion?: string;
 };
 
@@ -144,12 +148,21 @@ const JUDGE_TOOL: Anthropic.Tool = {
       },
       suspectValues: {
         type: "array",
-        description: "Only the values that are wrong, with their counts.",
+        description:
+          "Only the values that are wrong. Each needs the exact value as shown and what it should be replaced with.",
         items: {
           type: "object",
           properties: {
-            value: { type: "string" },
-            count: { type: "integer" }
+            value: {
+              type: "string",
+              description: "The wrong value, copied exactly as shown."
+            },
+            count: { type: "integer" },
+            correctedValue: {
+              type: "string",
+              description:
+                "The exact replacement value, ready to write into the model. Must be the literal corrected string (e.g. 'Insulation' not 'fix the spelling'). Omit only if you genuinely cannot determine it."
+            }
           },
           required: ["value", "count"],
           additionalProperties: false
@@ -164,6 +177,22 @@ const JUDGE_TOOL: Anthropic.Tool = {
     additionalProperties: false
   }
 };
+
+/**
+ * Rejects "corrections" that are not usable replacement values.
+ *
+ * A delta writes this string straight into the model, so a placeholder is worse
+ * than no suggestion at all — it would propose replacing a real value with
+ * literal text like `<UNKNOWN>`. Seen in practice when the model spots a wrong
+ * value but has no basis for the right one.
+ */
+function isUsableCorrection(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
+  // Angle-bracketed and template-style placeholders.
+  if (/^[<[{(].*[>\]})]$/.test(trimmed)) return false;
+  return !/^(unknown|tbd|n\/?a|none|null|todo|\?+)$/i.test(trimmed);
+}
 
 function estimateCost(usage: Omit<Usage, "estimatedCostUsd">): number {
   return (
@@ -260,6 +289,7 @@ export async function runInstruction(options: {
           content: [
             `Model: ${options.modelName ?? "unknown"}`,
             `Parameter: ${candidate.keyPath}`,
+            `Definition: ${candidate.internalDefinitionName}`,
             `Carried by ${candidate.objects} objects, ${candidate.distinctValues} distinct values.`,
             item.parts > 1
               ? `Showing part ${item.part} of ${item.parts} of the value list; judge only the values below.`
@@ -312,7 +342,15 @@ export async function runInstruction(options: {
       summary: judgement.summary,
       evidence: suspect.map((item) => ({
         value: String(item.value),
-        count: Number(item.count ?? 0)
+        count: Number(item.count ?? 0),
+        // Drives the write-back delta. Only kept when it is an actual
+        // replacement string and actually differs from the current value.
+        correctedValue:
+          typeof item.correctedValue === "string" &&
+          item.correctedValue !== String(item.value) &&
+          isUsableCorrection(item.correctedValue)
+            ? item.correctedValue
+            : null
       })),
       suggestion: judgement.suggestion ?? null
     });

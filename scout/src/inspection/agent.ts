@@ -19,7 +19,7 @@ import type { IndexedObject } from "./properties";
  * overshooting fails at runtime with "too many SQL variables".
  */
 const MAX_BOUND_PARAMETERS = 100;
-const PROPERTY_INSERT_COLUMNS = 6;
+const PROPERTY_INSERT_COLUMNS = 7;
 const PROPERTY_ROWS_PER_INSERT = Math.floor(
   MAX_BOUND_PARAMETERS / PROPERTY_INSERT_COLUMNS
 );
@@ -49,6 +49,17 @@ export type ValueCount = {
   units: string | null;
 };
 
+/**
+ * Bumped whenever the table shape changes.
+ *
+ * `CREATE TABLE IF NOT EXISTS` silently leaves an existing table alone, so an
+ * object created under an older shape would keep it and every insert would fail
+ * with "table properties has no column named ...". The index is disposable —
+ * rebuilt from Speckle per version — so the correct response to a mismatch is
+ * to drop and recreate rather than migrate in place.
+ */
+const SCHEMA_VERSION = 2;
+
 export class InspectionAgent extends Agent<Env> {
   /**
    * Bulk inserts go through `ctx.storage.sql` with multi-row VALUES rather than
@@ -59,7 +70,31 @@ export class InspectionAgent extends Agent<Env> {
     return this.ctx.storage.sql;
   }
 
+  private schemaChecked = false;
+
   private ensureTables(): void {
+    if (this.schemaChecked) return;
+
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS schema_meta (version INTEGER NOT NULL);"
+    );
+    const current =
+      this.db
+        .exec<{ version: number }>("SELECT version FROM schema_meta LIMIT 1;")
+        .toArray()[0]?.version ?? 0;
+
+    if (current !== SCHEMA_VERSION) {
+      // Stale or absent shape: start clean. Nothing here is a source of truth.
+      this.db.exec("DROP TABLE IF EXISTS properties;");
+      this.db.exec("DROP TABLE IF EXISTS objects;");
+      this.db.exec("DROP TABLE IF EXISTS run;");
+      this.db.exec("DELETE FROM schema_meta;");
+      this.db.exec(
+        "INSERT INTO schema_meta (version) VALUES (?);",
+        SCHEMA_VERSION
+      );
+    }
+
     this.db.exec(
       "CREATE TABLE IF NOT EXISTS objects (" +
         "id TEXT PRIMARY KEY, speckle_type TEXT, name TEXT, category TEXT," +
@@ -68,7 +103,10 @@ export class InspectionAgent extends Agent<Env> {
     this.db.exec(
       "CREATE TABLE IF NOT EXISTS properties (" +
         "object_id TEXT NOT NULL, key_path TEXT NOT NULL, name TEXT NOT NULL," +
-        "value_text TEXT, value_num REAL, units TEXT);"
+        "value_text TEXT, value_num REAL, units TEXT," +
+        // Addresses the parameter in a write-back delta. Never null: rows
+        // without one are dropped at index time as non-editable.
+        "internal_definition_name TEXT NOT NULL DEFAULT '');"
     );
     this.db.exec(
       "CREATE INDEX IF NOT EXISTS idx_props_key ON properties(key_path);"
@@ -86,6 +124,8 @@ export class InspectionAgent extends Agent<Env> {
         "findings_json TEXT, issue_identifier TEXT," +
         "started_at TEXT, finished_at TEXT, error TEXT);"
     );
+
+    this.schemaChecked = true;
   }
 
   /** Reset the index and mark a run started. Safe to call on re-delivery. */
@@ -131,7 +171,9 @@ export class InspectionAgent extends Agent<Env> {
         const rows = object.properties;
         for (let i = 0; i < rows.length; i += PROPERTY_ROWS_PER_INSERT) {
           const chunk = rows.slice(i, i + PROPERTY_ROWS_PER_INSERT);
-          const placeholders = chunk.map(() => "(?, ?, ?, ?, ?, ?)").join(",");
+          const placeholders = chunk
+            .map(() => "(?, ?, ?, ?, ?, ?, ?)")
+            .join(",");
           const bindings: (string | number | null)[] = [];
           for (const row of chunk) {
             bindings.push(
@@ -140,11 +182,12 @@ export class InspectionAgent extends Agent<Env> {
               row.name,
               row.valueText,
               row.valueNum,
-              row.units
+              row.units,
+              row.internalDefinitionName
             );
           }
           this.db.exec(
-            "INSERT INTO properties (object_id, key_path, name, value_text, value_num, units) VALUES " +
+            "INSERT INTO properties (object_id, key_path, name, value_text, value_num, units, internal_definition_name) VALUES " +
               placeholders +
               ";",
             ...bindings
@@ -293,7 +336,13 @@ export class InspectionAgent extends Agent<Env> {
       limit?: number;
     } = {}
   ): Promise<
-    { keyPath: string; name: string; objects: number; distinctValues: number }[]
+    {
+      keyPath: string;
+      name: string;
+      objects: number;
+      distinctValues: number;
+      internalDefinitionName: string;
+    }[]
   > {
     this.ensureTables();
     const minObjects = options.minObjects ?? 5;
@@ -314,10 +363,12 @@ export class InspectionAgent extends Agent<Env> {
         name: string;
         objects: number;
         distinctValues: number;
+        internalDefinitionName: string;
       }>(
         "SELECT key_path AS keyPath, name AS name," +
           " COUNT(DISTINCT object_id) AS objects," +
-          " COUNT(DISTINCT value_text) AS distinctValues" +
+          " COUNT(DISTINCT value_text) AS distinctValues," +
+          " MAX(internal_definition_name) AS internalDefinitionName" +
           " FROM properties GROUP BY key_path, name" +
           " HAVING objects >= ? AND distinctValues >= 2 AND distinctValues <= ?" +
           " AND SUM(CASE WHEN value_num IS NOT NULL THEN 1 ELSE 0 END) = 0" +
@@ -407,6 +458,51 @@ export class InspectionAgent extends Agent<Env> {
     return this.db
       .exec(
         "SELECT id, name, category, family, type, level FROM objects LIMIT ?;",
+        limit
+      )
+      .toArray();
+  }
+
+  /**
+   * Every object carrying a given value for a parameter, with the identifiers a
+   * write-back delta needs.
+   *
+   * A finding states "these values are wrong"; a delta has to name each object
+   * individually, so this is what turns one into the other.
+   */
+  async objectsWithValue(options: {
+    keyPath: string;
+    value: string;
+    limit?: number;
+  }): Promise<
+    {
+      objectId: string;
+      applicationId: string | null;
+      internalDefinitionName: string;
+      name: string | null;
+      category: string | null;
+    }[]
+  > {
+    this.ensureTables();
+    const limit = Math.min(options.limit ?? 500, 2000);
+    return this.db
+      .exec<{
+        objectId: string;
+        applicationId: string | null;
+        internalDefinitionName: string;
+        name: string | null;
+        category: string | null;
+      }>(
+        "SELECT o.id AS objectId, o.application_id AS applicationId," +
+          " p.internal_definition_name AS internalDefinitionName," +
+          " o.name AS name, o.category AS category" +
+          " FROM properties p JOIN objects o ON o.id = p.object_id" +
+          " WHERE p.key_path = ? AND p.value_text = ?" +
+          " AND o.application_id IS NOT NULL" +
+          " AND p.internal_definition_name <> ''" +
+          " LIMIT ?;",
+        options.keyPath,
+        options.value,
         limit
       )
       .toArray();

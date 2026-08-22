@@ -9,7 +9,13 @@ import {
   sortFindings,
   type Finding
 } from "./findings";
-import { createIssue, listOpenIssues, versionUrl } from "../speckle/client";
+import {
+  createIssue,
+  createResourceMeta,
+  listOpenIssues,
+  versionUrl
+} from "../speckle/client";
+import { buildDeltas } from "./deltas";
 import { getVersionInfo } from "../speckle/client";
 import { createLogger } from "../speckle/logging";
 import type { InspectionAgent } from "./agent";
@@ -332,9 +338,34 @@ ${versionUrl(projectId, modelId, versionId)}`
     findings: fresh.length
   });
 
+  const agent = await getAgentByName<Env, InspectionAgent>(
+    env.InspectionAgent,
+    versionId
+  );
+  const built = await buildDeltas({
+    findings: fresh.map((entry) => entry.finding),
+    agent,
+    logger
+  });
+
+  let attached = 0;
+  if (built.deltas.length > 0 && info.workspaceId) {
+    await createResourceMeta(env.SPECKLE_TOKEN, {
+      projectId,
+      workspaceId: info.workspaceId,
+      issueId: created.id,
+      changes: built.deltas
+    });
+    attached = built.deltas.length;
+  }
+
   return Response.json({
     outcome: "issue_created",
     issue: created,
+    deltasAttached: attached,
+    actionableFindings: built.actionableFindings,
+    withoutCorrection: built.withoutCorrection,
+    sampleDeltas: built.deltas.slice(0, 3),
     filed: fresh.length,
     suppressed: withPrints.length - fresh.length,
     openIssuesScanned: open.length,

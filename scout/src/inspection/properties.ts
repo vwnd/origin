@@ -1,3 +1,5 @@
+import { isEditableDefinition } from "./editable";
+
 /**
  * Flattens a Speckle DataObject into rows for the property index.
  *
@@ -74,6 +76,12 @@ export type PropertyRow = {
   valueText: string | null;
   valueNum: number | null;
   units: string | null;
+  /**
+   * Revit's stable identifier for the parameter, e.g. `DOOR_FIRE_RATING`.
+   * Required to address the parameter in a write-back delta, which is why a
+   * row without one is never stored.
+   */
+  internalDefinitionName: string;
 };
 
 export type IndexedObject = {
@@ -107,13 +115,19 @@ function str(value: unknown): string | null {
  * A Revit parameter wrapper: `{ value, name, internalDefinitionName?, units? }`
  * where `value` is scalar. Returns null for anything else so the walk recurses.
  */
-function asParameterLeaf(
-  record: Record<string, unknown>
-): { value: unknown; units: string | null } | null {
+function asParameterLeaf(record: Record<string, unknown>): {
+  value: unknown;
+  units: string | null;
+  internalDefinitionName: string | null;
+} | null {
   if (!("value" in record) || typeof record.name !== "string") return null;
   const value = record.value;
   if (value !== null && typeof value === "object") return null;
-  return { value, units: str(record.units) };
+  return {
+    value,
+    units: str(record.units),
+    internalDefinitionName: str(record.internalDefinitionName)
+  };
 }
 
 function pushValue(
@@ -121,16 +135,28 @@ function pushValue(
   keyPath: string,
   name: string,
   value: unknown,
-  units: string | null
+  units: string | null,
+  internalDefinitionName: string | null
 ): void {
   if (rows.length >= MAX_ROWS_PER_OBJECT) return;
   if (value === null || value === undefined || value === "") return;
+
+  // Only parameters the parameter updater could actually write are stored, so
+  // Scout never spends attention on a problem nobody can act on.
+  if (!isEditableDefinition(internalDefinitionName)) return;
 
   const valueNum =
     typeof value === "number" && Number.isFinite(value) ? value : null;
   const valueText = String(value).slice(0, MAX_VALUE_CHARS);
 
-  rows.push({ keyPath, name, valueText, valueNum, units });
+  rows.push({
+    keyPath,
+    name,
+    valueText,
+    valueNum,
+    units,
+    internalDefinitionName: internalDefinitionName as string
+  });
 }
 
 function walk(
@@ -149,7 +175,8 @@ function walk(
     if (value === null || value === undefined) continue;
 
     if (typeof value !== "object") {
-      pushValue(rows, keyPath, key, value, null);
+      // A bare scalar (elementId, worksetName, ...) carries no parameter
+      // definition, so it cannot be written back — skip rather than store.
       continue;
     }
 
@@ -163,7 +190,14 @@ function walk(
 
     const leaf = asParameterLeaf(value);
     if (leaf) {
-      pushValue(rows, keyPath, String(value.name), leaf.value, leaf.units);
+      pushValue(
+        rows,
+        keyPath,
+        String(value.name),
+        leaf.value,
+        leaf.units,
+        leaf.internalDefinitionName
+      );
       continue;
     }
 
