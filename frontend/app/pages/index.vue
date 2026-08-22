@@ -18,12 +18,11 @@ useSeoMeta({
 <template>
   <div class="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
     <h1 class="flex items-center justify-center font-black tracking-tight text-highlighted text-6xl sm:text-8xl">
-      <span>NerdSh</span>
       <SplatIcon
-        class="inline-block h-[0.65em] w-[0.65em] shrink-0 text-primary -mx-1 translate-y-[0.06em]"
+        class="inline-block h-[1em] w-[0.65em] shrink-0 text-primary -mx-1 translate-y-[0.06em]"
         aria-hidden="true"
       />
-      <span>t</span>
+      <span>rigo</span>
     </h1>
 
     <p class="max-w-md text-lg text-muted sm:text-xl">

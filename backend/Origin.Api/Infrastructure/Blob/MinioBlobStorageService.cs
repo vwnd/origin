@@ -59,4 +59,13 @@ public class MinioBlobStorageService(IMinioClient minioClient, IOptions<MinioOpt
 
         await minioClient.PutObjectAsync(args, cancellationToken);
     }
+
+    public async Task DeleteAsync(string objectName, CancellationToken cancellationToken = default)
+    {
+        var args = new RemoveObjectArgs()
+            .WithBucket(_options.BucketName)
+            .WithObject(objectName);
+
+        await minioClient.RemoveObjectAsync(args, cancellationToken);
+    }
 }

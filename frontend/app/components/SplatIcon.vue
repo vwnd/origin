@@ -1,9 +1,14 @@
 <script setup lang="ts">
-// Droplet arm drawn in local coords: narrow neck at the origin, flaring
-// into a round bulb at the tip (pointing up, so -y).
-const ARM = 'M-2.4 4Q-2.8-20-9.5-34A9.5 9.5 0 0 1 9.5-34Q2.8-20 2.4 4Z'
+// The mark reads as an 'O': a thick ink ring with droplet arms flung outward.
+// Arms are drawn in local coords with the neck rooted inside the ring band and
+// the bulb at the tip (pointing up, so -y).
+const ARM = 'M-3 -20Q-3.4-28-7-36A7 7 0 0 1 7-36Q3.4-28 3-20Z'
 
-// Six arms make the asterisk; the jitter in angle and scale keeps it splattered
+// Ring geometry: the stroke band spans radius 18.5 -> 31.5.
+const RING_R = 25
+const RING_W = 13
+
+// Six arms round the ring; the jitter in angle and scale keeps it splattered
 // rather than mechanical.
 const arms = [
   { angle: 0, scale: 1 },
@@ -35,7 +40,10 @@ const specks = [
       <circle
         cx="50"
         cy="50"
-        r="5"
+        :r="RING_R"
+        fill="none"
+        stroke="currentColor"
+        :stroke-width="RING_W"
       />
       <path
         v-for="arm in arms"

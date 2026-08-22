@@ -10,17 +10,21 @@ overlap (phasing, design options, grouped assemblies). Propose deleting only
 true duplicates.
 
 ## Inputs
+- Imported Revit warnings: "There are identical instances in the same
+  place." (detection seed — see fleet-rules.md, Detection sources)
 - Instance placement points, type, level, rotation/orientation, phase
   created/demolished, group and design-option membership, host,
   tag/schedule/sheet references
-  (placement points come from the geometry-read data feed — listed in the
-  infra asks; without them this task cannot run)
+  (placement points enrich the classification; the warning seed means the
+  task can run without them, with weaker tolerance checks)
 - Exceptions log: fleet/state/exceptions.md
 - Prior change requests for this task (approved and rejected)
 
 ## Detection
-1. Candidate pairs: same type, same level, placement points coincident
-   within tolerance (model precision, ~1mm), same orientation.
+1. Seed candidate pairs from the imported Revit warning list. Fallback (or
+   supplement, e.g. near-coincident pairs the warning's exact-overlap test
+   misses): same type, same level, placement points coincident within
+   tolerance (~1mm), same orientation.
 2. Classify:
    - **True duplicate**: identical in every respect, no phase difference,
      neither in a design option, at most one carrying references.

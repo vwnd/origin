@@ -9,6 +9,26 @@ FRONTEND_DIR="$SCRIPT_DIR/frontend"
 BACKEND_PORT=5291
 FRONTEND_PORT=3000
 
+FRONTEND_ARGS=""
+
+usage() {
+  cat <<'USAGE'
+Usage: dev.sh [--public]
+
+  --public   Expose the frontend dev server on the local network (nuxt --host)
+  -h, --help Show this help
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --public) FRONTEND_ARGS="-- --host" ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+  esac
+  shift
+done
+
 for cmd in docker dotnet pnpm; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "Missing required command: $cmd" >&2; exit 1; }
 done
@@ -62,8 +82,8 @@ echo "Starting backend API..."
 (cd "$API_DIR" && dotnet run 2>&1 | sed -u 's/^/[backend] /') &
 pids+=($!)
 
-echo "Starting frontend..."
-(cd "$FRONTEND_DIR" && pnpm run dev 2>&1 | sed -u 's/^/[frontend] /') &
+echo "Starting frontend${FRONTEND_ARGS:+ (public)}..."
+(cd "$FRONTEND_DIR" && pnpm run dev $FRONTEND_ARGS 2>&1 | sed -u 's/^/[frontend] /') &
 pids+=($!)
 
 wait

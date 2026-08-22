@@ -12,6 +12,8 @@ public record ProjectConventionSummaryResponse(
     Guid Id,
     string Name,
     string? Description,
+    bool IsActive,
+    int Priority,
     Guid? LatestVersionId,
     DateTimeOffset? LatestVersionCreatedAtUtc,
     int VersionCount);
@@ -32,6 +34,8 @@ public record ProjectConventionDetailResponse(
     Guid Id,
     string Name,
     string? Description,
+    bool IsActive,
+    int Priority,
     IReadOnlyList<ProjectConventionVersionSummaryResponse> Versions);
 
 // The editor pages render a single revision and label it, so the content response
@@ -44,3 +48,16 @@ public record ProjectConventionContentResponse(
     int VersionCount,
     DateTimeOffset CreatedAtUtc,
     string Content);
+
+// The toggle answers with the state it landed on, so a switch that fired against a
+// stale view corrects itself instead of drifting.
+public record ProjectConventionActivationResponse(Guid Id, bool IsActive);
+
+// Convention ids in the order they should run. A partial list is allowed: the listed
+// conventions are rearranged among the execution slots they already occupy, which is
+// what a drag within one page of a paginated list means.
+public record ReorderProjectConventionsRequest(IReadOnlyList<Guid> ConventionIds);
+
+// Every convention on the project, in execution order, so a reorder settles the caller's
+// view even when it only sent part of the list.
+public record ProjectConventionOrderResponse(IReadOnlyList<Guid> ConventionIds);

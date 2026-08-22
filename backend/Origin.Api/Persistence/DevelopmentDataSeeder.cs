@@ -64,7 +64,11 @@ public partial class DevelopmentDataSeeder(AppDbContext dbContext, IBlobStorageS
                     Id = Guid.NewGuid(),
                     ProjectId = project.Id,
                     Name = task.Title,
-                    Description = task.Summary
+                    Description = task.Summary,
+                    // Adoption order is the running order, and most conventions are switched
+                    // on — a few are not, so the list has something to show off.
+                    Priority = conventionIndex,
+                    IsActive = faker.Random.Double() > 0.25
                 };
 
                 dbContext.ProjectConventions.Add(convention);

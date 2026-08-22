@@ -93,6 +93,10 @@ public class ProjectsController(AppDbContext dbContext) : ControllerBase
         project.Id,
         project.Name,
         project.ProjectConventions
+            // Execution order, the same order the conventions endpoints report.
+            .OrderBy(convention => convention.Priority)
+            .ThenBy(convention => convention.Name)
+            .ThenBy(convention => convention.Id)
             .Select(convention => new ProjectConventionResponse(
                 convention.Id,
                 convention.Name,

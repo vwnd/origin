@@ -9,6 +9,8 @@ explain the decision. The value-add is the keeper call — Revit can flag the
 duplicate; it cannot tell you which room is the mistake.
 
 ## Inputs
+- Imported Revit warnings: duplicate room 'Number' values (detection seed —
+  see fleet-rules.md, Detection sources)
 - All Room objects: Number, Name, Level, Department, Area, phase,
   creation/edit recency where available
 - Sheet and schedule references: which sheets/schedules each room appears on
@@ -17,7 +19,9 @@ duplicate; it cannot tell you which room is the mistake.
 - Prior change requests for this task (approved and rejected)
 
 ## Detection
-1. Group rooms by Number within each phase. Any group >1 is a duplicate set.
+1. Seed duplicate sets from the imported Revit warning list. Fallback when
+   the warning feed is absent: group rooms by Number within each phase
+   (note degraded coverage in the daily report).
 2. Decide the keeper by weighing, in order:
    - **Documentation footprint**: the room referenced on more sheets and
      schedules keeps its number (renumbering it breaks the most annotation).

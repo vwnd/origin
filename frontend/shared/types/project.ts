@@ -14,6 +14,10 @@ export interface ProjectConventionSummary {
   id: string
   name: string
   description: string | null
+  /** Whether the project runs this convention. */
+  isActive: boolean
+  /** Execution order within the project, ascending. */
+  priority: number
   latestVersionId: string | null
   latestVersionCreatedAtUtc: string | null
   versionCount: number
@@ -46,7 +50,20 @@ export interface ProjectConventionDetail {
   id: string
   name: string
   description: string | null
+  isActive: boolean
+  priority: number
   versions: ProjectConventionVersionSummary[]
+}
+
+/** What the toggle endpoint answers with — the state the convention landed on. */
+export interface ProjectConventionActivation {
+  id: string
+  isActive: boolean
+}
+
+/** Every convention on the project, in execution order, as returned by a re-order. */
+export interface ProjectConventionOrder {
+  conventionIds: string[]
 }
 
 export interface ProjectConventionMetadata {

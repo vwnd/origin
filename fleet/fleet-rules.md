@@ -17,6 +17,49 @@ conflict, the stricter rule wins.
   subsequent days in severity order.
 - Per-task caps in task files apply first; the fleet cap applies to the remainder.
 
+## Context & rec report cap
+
+[context and rec] tasks deliver context & recommendation reports
+(formats/context-rec-report.md), not CRs. Reports have their own cap — **max 10
+new reports per day fleet-wide** (sweep: 25) — because they don't consume the
+CR cap but do compete for the same human attention. Same severity ordering,
+same deferred-backlog rule: overflow is counted, never dropped silently. On the
+issue panel, reports are grouped by recommended-action type, then level, so
+similar manual fixes batch into one Revit sitting.
+
+## Automate before agents
+
+Agents are for small, fast judgment tasks — not for driving viewers, waiting on
+loads, or mechanical data shuffling. Whenever a workflow step is
+deterministically automatable (data extraction and shaping, like the JSON
+exports in the bim2graph pipeline; warning-list import; select-by-ID locate
+info), it belongs in the pipeline as automation, not in an agent prompt. This
+keeps agent work time short and agent output focused on the judgment layer:
+triage, keeper calls, rationale. Rendered views for reports are parked under
+this rule — they return only as a deterministic, automatically-fired pipeline
+step, never as agent work. (Pipeline-side automation is largely the infra
+teammates' scope; this section states the boundary.)
+
+## Detection sources: warnings first
+
+Where Revit already detects the issue natively, the task **imports the Revit
+warning list as its detection seed** — it does not re-implement detection.
+The agent's work starts where the warning stops: triage (real vs. intentional),
+the keeper/fix judgment, the rationale, and the packaging. Task-side detection
+logic exists only as (a) a fallback when the warning feed is absent — noted in
+the daily report as degraded coverage — and (b) a supplement for what warnings
+miss. Semantic tasks (nomenclature, compliance) have no native warning and are
+fully agent-detected — that's their point.
+
+| Task | Native Revit warning seed |
+|---|---|
+| duplicate-marks | "Elements have duplicate 'Mark' values." |
+| duplicate-room-numbers | duplicate room 'Number' values |
+| identical-instances | "There are identical instances in the same place." |
+| overlap-locator | "Highlighted walls overlap." / wall–line overlap warnings |
+| off-axis-lines | "Line is slightly off axis and may cause inaccuracies." |
+| nomenclature | none — agent-detected |
+
 ## Severity ordering
 
 Every daily batch (and the daily report) is ordered by severity class, highest
@@ -24,9 +67,9 @@ first, so the reviewer's attention lands on what matters most:
 
 | Rank | Class | Tasks |
 |---|---|---|
-| 1 | Life-safety / compliance | compliance-check (diagnose-only findings lead the report) |
+| 1 | Life-safety / compliance | compliance-check (diagnose-only findings lead the report; CRs lead the batch) |
 | 2 | Documentation integrity — breaks schedules, tags, printed sets | duplicate-room-numbers, duplicate-marks |
-| 3 | Model integrity — double counts, phantom elements, clash noise | identical-instances, duplicate-doors |
+| 3 | Model integrity — double counts, overlaps, drafting inaccuracy | identical-instances, overlap-locator, off-axis-lines (archived: duplicate-doors) |
 | 4 | Consistency / cosmetic | nomenclature |
 
 Within a severity class, order by blast radius (element count affected), largest

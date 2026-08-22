@@ -19,6 +19,17 @@ public class ProjectConventionConfiguration : IEntityTypeConfiguration<ProjectCo
         builder.Property(x => x.Description)
             .HasMaxLength(2000);
 
+        builder.Property(x => x.IsActive)
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(x => x.Priority)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        // Every list of conventions is read in execution order, scoped to one project.
+        builder.HasIndex(x => new { x.ProjectId, x.Priority });
+
         builder.HasMany(x => x.Versions)
             .WithOne(x => x.ProjectConvention)
             .HasForeignKey(x => x.ProjectConventionId)
