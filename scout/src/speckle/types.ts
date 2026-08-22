@@ -26,16 +26,21 @@ export type SpeckleWebhookPayload = {
   webhook?: { id: string; triggers?: string[] };
 };
 
-/** `event.data` for a `commit_create` event. */
+/**
+ * `event.data` for a `commit_create` event, as Speckle builds it in
+ * `addCommitCreatedActivity`. Every field beyond the ids is best-effort — which
+ * keys actually arrive depends on the publish path, so `toPublishedVersion`
+ * reads defensively rather than trusting this shape.
+ */
 export type VersionCreatedData = {
-  /** Version id (same value as `commit.versionId`). */
-  id: string;
-  commit: {
-    versionId: string;
-    projectId: string;
-    modelId: string;
-    branchName: string;
-    objectId: string;
+  /** Version id (usually the same value as `commit.versionId`). */
+  id?: string;
+  commit?: {
+    versionId?: string;
+    projectId?: string;
+    modelId?: string;
+    branchName?: string;
+    objectId?: string;
     message?: string | null;
     sourceApplication?: string | null;
     totalChildrenCount?: number | null;
@@ -46,10 +51,11 @@ export type VersionCreatedData = {
 /** Narrowed, flat view of a version-published event. */
 export type PublishedVersion = {
   projectId: string;
-  modelId: string;
+  /** Absent on some publish paths — the issue is then not pinned to a model. */
+  modelId: string | null;
   versionId: string;
-  modelName: string;
-  objectId: string;
+  modelName: string | null;
+  objectId: string | null;
   message: string | null;
   sourceApplication: string | null;
   authorName: string | null;
@@ -75,30 +81,74 @@ export function parseWebhookEnvelope(
   return body as SpeckleWebhookEnvelope;
 }
 
+function str(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/** First non-empty string found under any of `keys`. */
+function pick(
+  sources: Record<string, unknown>[],
+  ...keys: string[]
+): string | null {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = str(source[key]);
+      if (value) return value;
+    }
+  }
+  return null;
+}
+
 /**
  * Pull the version details out of a `commit_create` payload.
- * Returns `null` if the payload does not carry the fields we need.
+ *
+ * Speckle builds `event.data.commit` by spreading the mutation input over a few
+ * derived ids, and the exact keys differ by publish path (connector, file
+ * upload, legacy `commitCreate`). So read tolerantly across the shapes rather
+ * than pinning to one: only the version id is genuinely required — everything
+ * else degrades to `null`, and an issue can still be created without it.
  */
 export function toPublishedVersion(
   payload: SpeckleWebhookPayload
 ): PublishedVersion | null {
   const data = payload.event.data;
-  if (!isRecord(data) || !isRecord(data.commit)) return null;
+  if (!isRecord(data)) return null;
 
-  const commit = data.commit as Partial<VersionCreatedData["commit"]>;
-  const versionId =
-    commit.versionId ?? (typeof data.id === "string" ? data.id : undefined);
+  // Candidate carriers, most specific first.
+  const sources = [
+    isRecord(data.commit) ? data.commit : null,
+    isRecord(data.version) ? data.version : null,
+    data
+  ].filter((s): s is Record<string, unknown> => s !== null);
 
-  if (!versionId || !commit.modelId || !commit.objectId) return null;
+  const versionId = pick(sources, "versionId", "commitId", "id");
+  if (!versionId) return null;
 
   return {
     projectId: payload.streamId,
-    modelId: commit.modelId,
+    modelId: pick(sources, "modelId", "branchId"),
     versionId,
-    modelName: commit.branchName ?? "unknown",
-    objectId: commit.objectId,
-    message: commit.message ?? null,
-    sourceApplication: commit.sourceApplication ?? null,
-    authorName: payload.user?.name ?? null
+    modelName: pick(sources, "branchName", "modelName"),
+    // `Version` records call this `referencedObject`; inputs call it `objectId`.
+    objectId: pick(sources, "objectId", "referencedObject"),
+    message: pick(sources, "message"),
+    sourceApplication: pick(sources, "sourceApplication"),
+    authorName: str(payload.user?.name)
   };
+}
+
+/**
+ * Compact description of `event.data` for diagnostics, so an unexpected payload
+ * shape can be identified from the logs without dumping the whole delivery.
+ */
+export function describeEventData(payload: SpeckleWebhookPayload): string {
+  const data = payload.event.data;
+  if (!isRecord(data)) return `non-object: ${typeof data}`;
+  const parts = [`data keys: ${Object.keys(data).join(",")}`];
+  for (const key of ["commit", "version"]) {
+    const nested = data[key];
+    if (isRecord(nested))
+      parts.push(`${key} keys: ${Object.keys(nested).join(",")}`);
+  }
+  return parts.join(" | ");
 }

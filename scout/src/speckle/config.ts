@@ -6,12 +6,12 @@
  */
 
 /**
- * The one Speckle project Scout reacts to. Webhook deliveries for any other
- * project are acknowledged and ignored.
+ * Speckle server hosting the project. Change for self-hosted instances.
+ *
+ * There is no project-id constant: a Speckle webhook is created inside one
+ * project and only ever fires for that project, so `payload.streamId` on each
+ * delivery is the project to act on.
  */
-export const SPECKLE_PROJECT_ID = "REPLACE_WITH_PROJECT_ID";
-
-/** Speckle server hosting the project above. Change for self-hosted instances. */
 export const SPECKLE_SERVER_URL = "https://app.speckle.systems";
 
 /** Path the Speckle webhook posts to. Configure this in Project → Settings → Webhooks. */

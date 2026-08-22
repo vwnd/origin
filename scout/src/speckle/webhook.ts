@@ -1,15 +1,14 @@
-import {
-  SPECKLE_PROJECT_ID,
-  SPECKLE_WEBHOOK_PATH,
-  VERSION_CREATED_EVENT
-} from "./config";
-import { createIssue, versionResourceId } from "./client";
+import { SPECKLE_WEBHOOK_PATH, VERSION_CREATED_EVENT } from "./config";
+import { createIssue, versionUrl } from "./client";
 import { SIGNATURE_HEADER, verifySignature } from "./signature";
 import {
+  describeEventData,
   parseWebhookEnvelope,
   toPublishedVersion,
   type PublishedVersion
 } from "./types";
+import { recordDelivery, type DeliveryMetrics } from "./analytics";
+import { createLogger, errorMessage, type Logger } from "./logging";
 
 /** True when this request is a Speckle webhook delivery. */
 export function isSpeckleWebhookRequest(request: Request): boolean {
@@ -19,27 +18,77 @@ export function isSpeckleWebhookRequest(request: Request): boolean {
   );
 }
 
-function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status });
-}
+/** What `processDelivery` decided, before it becomes a Response. */
+type DeliveryResult = {
+  status: number;
+  body: Record<string, unknown>;
+} & Omit<DeliveryMetrics, "durationMs" | "status">;
 
 /**
  * Handle one Speckle webhook delivery.
  *
- * Deliveries we do not act on still return 2xx so Speckle does not mark them
- * failed and retry — only genuine faults on our side return 4xx/5xx.
+ * Every exit path funnels through `recordDelivery`, so no outcome can slip past
+ * the logs or the analytics dataset.
  */
 export async function handleSpeckleWebhook(
   request: Request,
   env: Env
 ): Promise<Response> {
+  const startedAt = Date.now();
+  const logger = createLogger(crypto.randomUUID(), {
+    version: env.CF_VERSION_METADATA?.tag || env.CF_VERSION_METADATA?.id
+  });
+
+  logger.info("delivery_received", {
+    hasSignature: request.headers.has(SIGNATURE_HEADER),
+    contentLength: request.headers.get("content-length")
+  });
+
+  let result: DeliveryResult;
+  try {
+    result = await processDelivery(request, env, logger);
+  } catch (error) {
+    // Unexpected fault — still measured, so it cannot hide.
+    logger.error("delivery_unhandled_error", { error: errorMessage(error) });
+    result = {
+      status: 500,
+      body: { error: "Internal error" },
+      outcome: "speckle_error",
+      error: errorMessage(error)
+    };
+  }
+
+  recordDelivery(env, logger, {
+    ...result,
+    status: result.status,
+    durationMs: Date.now() - startedAt
+  });
+
+  return Response.json(
+    { ...result.body, deliveryId: logger.deliveryId },
+    { status: result.status }
+  );
+}
+
+/**
+ * Deliveries we do not act on still resolve to 2xx so Speckle does not mark
+ * them failed and retry — only genuine faults resolve to 4xx/5xx.
+ */
+async function processDelivery(
+  request: Request,
+  env: Env,
+  logger: Logger
+): Promise<DeliveryResult> {
   if (!env.SPECKLE_WEBHOOK_SECRET || !env.SPECKLE_TOKEN) {
-    console.error({
-      msg: "speckle webhook not configured",
+    logger.error("not_configured", {
       hasSecret: Boolean(env.SPECKLE_WEBHOOK_SECRET),
       hasToken: Boolean(env.SPECKLE_TOKEN)
     });
-    return json({ error: "Speckle credentials are not configured" }, 500);
+    return {
+      status: 500,
+      body: { error: "Speckle credentials are not configured" },
+      outcome: "not_configured"
+    };
   }
 
   // The signature covers the exact bytes Speckle sent, so hash the raw text.
@@ -51,69 +100,123 @@ export async function handleSpeckleWebhook(
   });
 
   if (!signatureValid) {
-    console.warn({ msg: "speckle webhook signature rejected" });
-    return json({ error: "Invalid signature" }, 401);
+    logger.warn("signature_rejected", { bodyBytes: rawBody.length });
+    return {
+      status: 401,
+      body: { error: "Invalid signature" },
+      outcome: "bad_signature"
+    };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawBody);
   } catch {
-    return json({ error: "Body is not valid JSON" }, 400);
+    logger.warn("body_not_json", { bodyBytes: rawBody.length });
+    return {
+      status: 400,
+      body: { error: "Body is not valid JSON" },
+      outcome: "bad_request",
+      error: "invalid json"
+    };
   }
 
   const envelope = parseWebhookEnvelope(parsed);
   if (!envelope) {
-    return json({ error: "Unrecognised webhook payload" }, 400);
+    logger.warn("payload_unrecognised");
+    return {
+      status: 400,
+      body: { error: "Unrecognised webhook payload" },
+      outcome: "bad_request",
+      error: "unrecognised payload"
+    };
   }
 
   const { payload } = envelope;
   const eventName = payload.event.event_name;
 
-  if (payload.streamId !== SPECKLE_PROJECT_ID) {
-    return json({ ignored: "project", projectId: payload.streamId });
-  }
-
+  // No project filter: the webhook lives inside one Speckle project, so every
+  // delivery already belongs to the project named by `payload.streamId`.
   if (eventName !== VERSION_CREATED_EVENT) {
-    return json({ ignored: "event", event: eventName });
+    logger.info("ignored_event", { eventName });
+    return {
+      status: 200,
+      body: { ignored: "event", event: eventName },
+      outcome: "ignored_event",
+      eventName,
+      projectId: payload.streamId
+    };
   }
 
   const version = toPublishedVersion(payload);
   if (!version) {
-    console.warn({ msg: "version_create payload missing fields", eventName });
-    return json({ ignored: "payload", event: eventName });
+    // Log the shape, not the contents, so an unexpected payload can be
+    // diagnosed from the logs alone.
+    logger.warn("payload_missing_fields", {
+      eventName,
+      dataShape: describeEventData(payload)
+    });
+    return {
+      status: 200,
+      body: { ignored: "payload", event: eventName },
+      outcome: "ignored_payload",
+      eventName,
+      projectId: payload.streamId,
+      error: "version fields missing"
+    };
   }
 
-  console.log({
-    msg: "speckle version published",
+  logger.info("version_published", {
+    eventName,
     projectId: version.projectId,
     modelId: version.modelId,
-    versionId: version.versionId
+    modelName: version.modelName,
+    versionId: version.versionId,
+    sourceApplication: version.sourceApplication,
+    // Surfaced once so a shape change shows up even on the success path.
+    dataShape: describeEventData(payload)
   });
+
+  const versionFields = {
+    eventName,
+    projectId: version.projectId,
+    modelId: version.modelId,
+    versionId: version.versionId,
+    sourceApplication: version.sourceApplication
+  };
 
   try {
     const issue = await createIssue(env.SPECKLE_TOKEN, {
       projectId: version.projectId,
       title: "hello world",
-      description: helloWorldDescription(version),
-      resourceIdString: versionResourceId(version.modelId, version.versionId)
+      description: helloWorldDescription(version)
+      // No `anchor`: pinning an issue to the version needs a viewerState and a
+      // screenshot alongside the resource id, and we have neither here. The
+      // description carries a link to the version instead.
     });
 
-    console.log({
-      msg: "speckle issue created",
+    logger.info("issue_created", {
       issueId: issue.id,
-      identifier: issue.identifier,
-      versionId: version.versionId
+      issueIdentifier: issue.identifier,
+      issueNumber: issue.number
     });
 
-    return json({ created: issue.identifier, issueId: issue.id }, 201);
+    return {
+      status: 201,
+      body: { created: issue.identifier, issueId: issue.id },
+      outcome: "issue_created",
+      issueIdentifier: issue.identifier,
+      ...versionFields
+    };
   } catch (error) {
-    console.error({
-      msg: "speckle issue creation failed",
-      versionId: version.versionId,
-      error: error instanceof Error ? error.message : String(error)
-    });
-    return json({ error: "Failed to create Speckle issue" }, 502);
+    logger.error("issue_creation_failed", { error: errorMessage(error) });
+    return {
+      status: 502,
+      body: { error: "Failed to create Speckle issue" },
+      outcome: "speckle_error",
+      error: errorMessage(error),
+      ...versionFields
+    };
   }
 }
 
@@ -121,5 +224,9 @@ export async function handleSpeckleWebhook(
 function helloWorldDescription(version: PublishedVersion): string {
   const from = version.sourceApplication ?? "unknown source";
   const by = version.authorName ?? "unknown author";
-  return `hello world — new version ${version.versionId} on model ${version.modelName} (published from ${from} by ${by}).`;
+  const model = version.modelName ?? version.modelId ?? "unknown model";
+  const link = version.modelId
+    ? ` ${versionUrl(version.projectId, version.modelId, version.versionId)}`
+    : "";
+  return `hello world — new version ${version.versionId} on model ${model} (published from ${from} by ${by}).${link}`;
 }

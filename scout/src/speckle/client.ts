@@ -70,13 +70,36 @@ export function proseMirrorDoc(text: string) {
   };
 }
 
-/**
- * Speckle resource identifier for a specific version of a model.
- * Passing this as `resourceIdString` pins the issue to that version.
- */
+/** Speckle resource identifier for a specific version of a model. */
 export function versionResourceId(modelId: string, versionId: string): string {
   return `${modelId}@${versionId}`;
 }
+
+/** Web URL for a specific version of a model. */
+export function versionUrl(
+  projectId: string,
+  modelId: string,
+  versionId: string
+): string {
+  return `${SPECKLE_SERVER_URL}/projects/${projectId}/models/${versionResourceId(modelId, versionId)}`;
+}
+
+/**
+ * Anchors an issue to 3D data in the viewer.
+ *
+ * Speckle rejects these three fields unless all are present:
+ * "Incomplete 3D data reference provided. viewerState, resourceIdString and
+ * screenshot must all be provided together." Grouping them in one object makes
+ * a partial anchor unrepresentable — pass the whole thing or nothing.
+ */
+export type IssueAnchor = {
+  /** e.g. `modelId@versionId` — see `versionResourceId`. */
+  resourceIdString: string;
+  /** SerializedViewerState (camera, filters, loaded resources). */
+  viewerState: Record<string, unknown>;
+  /** Screenshot of the view, as a data URL. */
+  screenshot: string;
+};
 
 const CREATE_ISSUE = /* GraphQL */ `
   mutation ScoutCreateIssue($input: CreateIssueInput!) {
@@ -106,7 +129,8 @@ export async function createIssue(
     projectId: string;
     title: string;
     description?: string;
-    resourceIdString?: string;
+    /** Omit for a project-level issue not tied to any 3D resource. */
+    anchor?: IssueAnchor;
   }
 ): Promise<CreatedIssue> {
   const data = await graphql<{
@@ -115,10 +139,10 @@ export async function createIssue(
     input: {
       projectId: input.projectId,
       title: input.title,
-      resourceIdString: input.resourceIdString,
       ...(input.description
         ? { description: proseMirrorDoc(input.description) }
-        : {})
+        : {}),
+      ...(input.anchor ?? {})
     }
   });
 

@@ -44,10 +44,12 @@ src/
   client.tsx   # React entry point
   styles.css   # Tailwind + Kumo styles
   speckle/
-    config.ts     # Project id, server URL, webhook path (non-secret constants)
+    config.ts     # Server URL, webhook path, event name (non-secret constants)
     types.ts      # Webhook payload shape + parsing
     signature.ts  # HMAC-SHA256 delivery verification
     client.ts     # GraphQL client (createIssue)
+    logging.ts    # Structured JSON logger
+    analytics.ts  # Workers Analytics Engine data points
     webhook.ts    # Delivery handler
 ```
 
@@ -65,8 +67,8 @@ src/
 ## Speckle integration
 
 Scout reacts to Speckle webhooks. Today it does one thing, to prove the pipeline
-end to end: when a new version is published to a model in one specific project,
-it creates a "hello world" issue on that project, pinned to the new version.
+end to end: when a new version is published to a model, it creates a
+"hello world" issue on that project, pinned to the new version.
 
 ### How a delivery flows
 
@@ -74,22 +76,26 @@ it creates a "hello world" issue on that project, pinned to the new version.
    `X-WEBHOOK-SIGNATURE` header — hex HMAC-SHA256 of the raw body.
 2. `handleSpeckleWebhook` verifies the signature against `SPECKLE_WEBHOOK_SECRET`
    (401 if it does not match).
-3. Deliveries for other projects, or events other than `commit_create`, are
-   acknowledged with 200 and ignored — Speckle only retries on non-2xx.
+3. Events other than `commit_create` are acknowledged with 200 and ignored —
+   Speckle only retries on non-2xx.
 4. For a match, it calls `projectMutations.issues.createIssue` and returns 201.
 
 Speckle's UI shows the trigger as `version_create`, but the value on the wire is
 the legacy name `commit_create` — that is what the code matches on.
 
+There is no project-id filter. A Speckle webhook is created inside one project
+and only fires for that project, so the project to act on is whatever
+`payload.streamId` names on each delivery.
+
 ### Configuration
 
 Non-secret settings live in `src/speckle/config.ts`:
 
-| Constant               | Meaning                                                        |
-| ---------------------- | -------------------------------------------------------------- |
-| `SPECKLE_PROJECT_ID`   | The only project Scout acts on. **Set this before deploying.** |
-| `SPECKLE_SERVER_URL`   | Speckle server. Change for self-hosted.                        |
-| `SPECKLE_WEBHOOK_PATH` | Path the webhook posts to.                                     |
+| Constant                | Meaning                                     |
+| ----------------------- | ------------------------------------------- |
+| `SPECKLE_SERVER_URL`    | Speckle server. Change for self-hosted.     |
+| `SPECKLE_WEBHOOK_PATH`  | Path the webhook posts to.                  |
+| `VERSION_CREATED_EVENT` | Wire name of the trigger (`commit_create`). |
 
 Secrets are Worker secrets, not config (see `.dev.vars.example`):
 
@@ -109,6 +115,70 @@ In the Speckle project: **Settings → Webhooks → Create webhook**
 - **Secret** — the same value you stored as `SPECKLE_WEBHOOK_SECRET`
 
 You cannot read the secret back after saving it, so store it when you create it.
+
+### Logs and analytics
+
+Every delivery is measured exactly once, whatever the result. Each carries a
+`deliveryId` — also returned in the HTTP response body — so a response, its log
+lines, and its analytics row all join up.
+
+**Outcomes**, the one value to group by:
+
+| Outcome           | Status | Meaning                         |
+| ----------------- | ------ | ------------------------------- |
+| `issue_created`   | 201    | Matched, issue created          |
+| `ignored_event`   | 200    | Event we do not act on          |
+| `ignored_payload` | 200    | Right event, missing fields     |
+| `bad_signature`   | 401    | HMAC did not verify             |
+| `bad_request`     | 400    | Unparseable body or payload     |
+| `not_configured`  | 500    | Missing token or webhook secret |
+| `speckle_error`   | 502    | Speckle rejected issue creation |
+
+**Logs** — structured JSON, one object per line, via Workers Logs
+(`observability` is enabled at a 1.0 sampling rate):
+
+```bash
+wrangler tail --format pretty        # live
+wrangler tail --search issue_created # one event type
+```
+
+Fields are queryable in the dashboard as `$.event`, `$.outcome`,
+`$.deliveryId`, `$.versionId`.
+
+**Analytics** — one data point per delivery in the `scout_speckle_deliveries`
+dataset. Slots are positional:
+
+| Slot     | Value              | Slot      | Value                |
+| -------- | ------------------ | --------- | -------------------- |
+| `index1` | outcome            | `blob7`   | issue identifier     |
+| `blob1`  | outcome            | `blob8`   | error (truncated)    |
+| `blob2`  | event name         | `blob9`   | delivery id          |
+| `blob3`  | project id         | `blob10`  | worker version tag   |
+| `blob4`  | model id           | `double1` | HTTP status          |
+| `blob5`  | version id         | `double2` | duration (ms)        |
+| `blob6`  | source application | `double3` | 1 on success, else 0 |
+
+Query with the SQL API (needs an API token with Account Analytics Read):
+
+```bash
+curl "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/analytics_engine/sql"   -H "Authorization: Bearer $CF_API_TOKEN"   --data "SELECT blob1 AS outcome, count() AS n, avg(double2) AS avg_ms
+          FROM scout_speckle_deliveries
+          WHERE timestamp > NOW() - INTERVAL '1' DAY
+          GROUP BY outcome ORDER BY n DESC"
+```
+
+Recent deliveries, newest first:
+
+```sql
+SELECT timestamp, blob1 AS outcome, blob5 AS version_id,
+       blob7 AS issue, blob8 AS error, double2 AS ms
+FROM scout_speckle_deliveries
+WHERE timestamp > NOW() - INTERVAL '1' DAY
+ORDER BY timestamp DESC LIMIT 20
+```
+
+The Analytics Engine binding does not work in local dev — `recordDelivery`
+no-ops there, and the logs still print.
 
 ## Making it your own
 
