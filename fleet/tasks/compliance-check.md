@@ -1,14 +1,14 @@
 # Task: Compliance Check (fire ratings and required values)
 
-Severity class: 1 (life-safety/compliance) · Phase: v1
+Severity class: 1 (life-safety/compliance) · Phase: v1 · Fix policy: suggest-with-options (parameter update CRs)
 
 ## Objective
 Verify that required parameter values (fire ratings, occupancy, and other
 rules a firm declares) are present, consistent, and semantically coherent —
 the check Revit cannot do, because "4 HR", "4hr", "4 hours", and "240 min"
-are four strings to Revit and one rating to a code official. Deliver precise
-findings. This task never drafts fixes: a missing rating is a design
-decision, not a typo.
+are four strings to Revit and one rating to a code official. Draft parameter
+update CRs where the correct value is defensible; deliver diagnosis where it
+is a design decision. Never guess a rating into existence.
 
 ## Inputs
 - Element parameters for every category named in the compliance rules
@@ -17,56 +17,64 @@ decision, not a typo.
 - Compliance rules file (required for requirement checks):
   /standards/compliance.md
 - Exceptions log: fleet/state/exceptions.md
-- Prior findings from this task (to mark long-standing vs. new)
+- Prior CRs and findings from this task (approved, rejected, standing)
 
 ## Detection
 1. For each rule in compliance.md, resolve its scope to concrete elements,
    then check the requirement. Normalize semantically equivalent values
    before comparing ("2 HR" satisfies "2 hours"; "45 min" satisfies
-   "0.75 hr") — but always report the value as written in the model.
+   "0.75 hr") — and report the value as written in the model.
 2. Consistency checks run even without a rules file:
-   - Same rating written in different forms across a wall type or level —
-     flag for normalization (the divergence itself is the finding).
+   - Same rating written in different forms across a type or level.
    - Conflicting ratings: a door rated below its host wall's requirement,
      or two instances of one type carrying different values.
    - Required parameter empty on an element whose peers all carry a value.
-3. Skip findings matching the Exceptions log. Mark each finding NEW or
-   STANDING (with first-seen date) so repeat findings read as unresolved,
-   not rediscovered.
+3. Skip findings matching the Exceptions log. Mark diagnose-only findings
+   NEW or STANDING (first-seen date) so repeats read as unresolved, not
+   rediscovered.
 
-## Fix policy: diagnose-only
-Never draft a CR, even for pure normalization renames. Every finding is a
-daily-report entry stating: element(s), the rule (cited from compliance.md,
-with source column), the value as written, and what satisfying the rule
-requires. Value normalization is a candidate for promotion to
-suggest-with-options once this task's diagnoses prove reliable — that
-promotion is a task-file edit a firm makes deliberately, not a drift.
+## Fix policy: suggest-with-options (parameter update CRs), diagnose where ambiguous
+Draft a parameter update CR when the correct value is determined by the
+rules or the model itself:
+- **Normalization**: equivalent-but-differently-written values rewritten to
+  the standard's written form ("2 HR" → "2 hours" per compliance.md).
+- **Conflict resolution with a defensible answer**: instances of one type
+  diverging where the type's value is established — propose aligning, with
+  the source stated; offer at most 2 options when two readings are viable.
+
+Stay diagnose-only (report entry, no CR) when the fix would *invent* a
+value: a missing rating, or a door genuinely under-rated for its host wall —
+those are design decisions. The report entry still names the element, the
+rule (cited with source), the value as written, and what satisfying the
+rule requires.
 
 ## Confidence gate
-- [HIGH]: the rule clearly applies and the value is missing or clearly
-  short of the requirement.
-- [MED]: scope match is uncertain (e.g. "rated wall" reading is ambiguous)
-  or equivalence is uncertain. Report as "possible finding" with the
-  ambiguity stated.
+- High (draft CR): the rule clearly applies and the target written form is
+  explicit in compliance.md or unanimous among peers.
+- Medium (flag, no CR): scope match uncertain (e.g. "rated wall" reading is
+  ambiguous), equivalence uncertain, or peers disagree on the written form.
 - Ambiguous or conflicting rules in compliance.md: report the ambiguity
-  itself; check neither reading against the model.
+  itself; enforce neither reading.
 
 ## Change request format
-Not applicable — this task produces report entries only. Findings lead the
-daily report (severity class 1), [HIGH] before [MED], and follow the
-compliance-findings line format in formats/daily-report.md.
+- Element/type ID, parameter, current value → proposed value
+- One-line rationale citing the rule and source column ("per compliance.md:
+  ratings written in hours; '120 min' → '2 hours', IBC 713.4")
+- Batch by rule, max 15 updates per CR
+- Diagnose-only findings lead the daily report (severity class 1),
+  [HIGH] before [MED]
 
 ## Feedback handling
-If the BIM manager marks a finding as intentional or not-applicable, log it
-to the Exceptions log (element scope; pattern scope if they indicate a
-class). Never re-report an excepted finding. 3+ dismissals sharing a
-pattern → suggest the corresponding compliance.md scope tightening in the
-daily report.
+Rejected CR or dismissed finding → Exceptions log (element scope; pattern
+scope when the reason names a class). Never re-propose or re-report. 3+
+rejections sharing a pattern → suggest the corresponding compliance.md
+edit in the daily report; never silently rewrite the standards file.
 
 ## Hard limits
-- No CRs, no writes of any kind, ever, from this task.
-- Max 15 findings per daily report; overflow goes to the deferred backlog
-  with the total count, worst (highest-confidence, life-safety-first)
-  findings reported first.
+- Parameter writes only, and only to values already defensible from the
+  rules file or the model — never invent a rating. Missing values are
+  always diagnose-only.
+- Max 2 CRs per day for this task; max 15 diagnose findings per report,
+  overflow to the deferred backlog, life-safety-first.
 - If compliance.md is missing, run consistency checks only and note in the
   report that requirement checks are off.

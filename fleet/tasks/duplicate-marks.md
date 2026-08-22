@@ -10,6 +10,8 @@ them. The value-add is scheme-consistent renumbering plus the
 intentional-vs-accidental call.
 
 ## Inputs
+- Imported Revit warnings: "Elements have duplicate 'Mark' values."
+  (detection seed — see fleet-rules.md, Detection sources)
 - Element Mark parameters by category (doors, windows, casework, equipment,
   ...): Mark, type, level, host, phase
 - Project standards file (optional): /standards/naming.md (mark schemes)
@@ -17,7 +19,10 @@ intentional-vs-accidental call.
 - Prior change requests for this task (approved and rejected)
 
 ## Detection
-1. Within each category and phase, group by Mark. Groups >1 are duplicates.
+1. Seed duplicate groups from the imported Revit warning list — don't
+   re-detect what Revit already flagged. Fallback when the warning feed is
+   absent: group by Mark within category and phase (note degraded coverage
+   in the daily report).
 2. Classify each group:
    - **Accidental**: typically copy/paste or mirrored elements where every
      other property diverges (different levels, different hosts).

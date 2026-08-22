@@ -5,6 +5,16 @@ detects model-health and semantic issues, drafts small reviewable change request
 (CRs), and delivers them for human approval in Revit. Nothing changes a model
 without a BIM manager approving it.
 
+The value is two-fold:
+
+1. **Pre-drafted fixes** — small, reviewable CRs, approved by a human.
+2. **Pre-done investigation** — for issues the fleet can't (or shouldn't) fix,
+   it still saves the energy of *locating, inspecting, and analyzing*: the issue
+   arrives found, dissected, and with a recommended action, as a context &
+   recommendation report (see formats/context-rec-report.md).
+
+Who detects what, and the deliverable class per issue: see scope-map.md.
+
 ## Pipeline
 
 Revit → Speckle → Origo server → **agent fleet (this directory)** → Origo server
@@ -17,17 +27,22 @@ pushed back. The fleet runs daily as background maintenance.
 fleet/
   README.md              this file
   fleet-rules.md         global runner rules: batch cap, severity ordering, safety invariants
+  scope-map.md           who detects what, deliverable class per issue, design principles
   tasks/                 one markdown file per task — the customizable product surface
     nomenclature.md
     compliance-check.md
     duplicate-room-numbers.md
     duplicate-marks.md
-    duplicate-doors.md
     identical-instances.md
+    overlap-locator.md       wall & line overlaps → context & rec (v1.5, geo read)
+    off-axis-lines.md        slightly off-axis lines/ref planes (v1.5 context & rec → v2 snap)
+    archive/                 parked tasks (lower value-add for now; skeleton kept current)
+      duplicate-doors.md
   formats/               shared file-format specs
     standards-file.md    the rules files a firm authors (naming + compliance), with templates
     exceptions-log.md    shared rejected-fix log all tasks must respect
     daily-report.md      the daily report the runner assembles
+    context-rec-report.md  the [context and rec] deliverable for issues fixed manually
   state/                 runner-maintained state (exceptions log, reports) — created at runtime
 ```
 
@@ -38,6 +53,11 @@ uniformly: **Objective, Inputs, Detection, Fix policy, Confidence gate, Change
 request format, Feedback handling, Hard limits.** Hard limits live in the task
 file — visible to customizing firms — not hidden in the runner.
 
+Detection is **warnings-first** (fleet-rules.md): where Revit natively warns
+about the issue, the imported warning list is the detection seed and the agent
+adds the judgment on top — triage, keeper calls, fix drafting, packaging. Only
+semantic tasks detect from scratch.
+
 ## Fix-policy classes
 
 - **Auto-propose** — deterministic fix; the agent adds rationale and a confidence call.
@@ -45,6 +65,10 @@ file — visible to customizing firms — not hidden in the runner.
   preference, max 2 options.
 - **Diagnose-only** — frequently a design condition in progress, not an error.
   Never auto-fix; a precise diagnosis is the deliverable.
+- **[context and rec]** — the fix must happen by hand in Revit, so the
+  deliverable is a context & recommendation report: located (Select-by-ID-ready
+  IDs, level, grid), dissected, with a recommended action. The fleet does the
+  finding and the judgement; the user does the clicking.
 
 ## Safety model
 
@@ -78,6 +102,17 @@ The task markdowns and the standards files are the product surface a firm edits:
 - Rejected CRs must flow back to the agent layer with the rejection reason (or
   at minimum the reject event) — the Exceptions log and convention-revision
   loop depend on it.
-- Phase/hosting data through Speckle — door and instance dedup tasks need it.
+- **Revit warning import** in the Origo → agent data feed (warning type,
+  message, element ids, ideally with each sync) — most non-semantic tasks seed
+  detection from it instead of re-implementing what Revit already catches.
+- Phase/hosting data through Speckle — instance dedup needs it.
 - Element **delete** operations in the CR round trip (alongside parameter
-  writes) — duplicate-doors and identical-instances propose deletes in v1.
+  writes) — identical-instances proposes deletes in v1.
+- **(Parked) server-side view rendering** for context & rec reports: wireframe,
+  camera framing, highlight, screenshot capture. Only worth building as a
+  deterministic, automatically-fired pipeline step — never agent-driven
+  (fleet-rules.md, Automate before agents). Reports work without it via
+  Select by ID + level/grid locate info.
+- **Issue panel grouping**: the panel should group issues that can be fixed or
+  inspected conveniently in batch — by proposed-action type, then level — and
+  feed dismiss-with-reason back to the agent layer like CR rejections.

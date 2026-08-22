@@ -63,6 +63,9 @@ Ordered as delivered for review, severity first.
   rank 1). Tag `[HIGH]`/`[MED]` per the task's confidence gate.
 - **Change requests drafted** — one line per CR: id, task, scope, what changes,
   count. The full detail lives in the CR itself; this is the index.
+- **Context & rec reports issued** — one line per report: id, task, location,
+  recommended action. Full detail (dissection, measurements) lives in the
+  report on the issue panel; this is the index. Follows the CR section.
 - **Flagged, no CR** — medium-confidence detections and uncertain exception
   matches. These exist so nothing is silently dropped, and so the manager can
   promote one to a fix by tightening a rule.
