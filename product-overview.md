@@ -216,7 +216,7 @@ morning     ~8 CRs, severity-ordered, + one 2-minute daily report
             rejections ──► Exceptions log ──► never re-proposed
 ```
 
-Same machinery, two other modes: **pre-milestone sweep** (caps 10 → 25;
+Optional switch to other modes: **pre-milestone sweep** (caps 10 → 25;
 gates and hard limits unchanged — sweep changes volume, not judgment) and
 **incoming model audit** (health report on a consultant's model before
 linking).
@@ -242,8 +242,7 @@ Plus the caps: max 10 CRs/day, ~8 as the design center, ~5-minute review.
 Overflow becomes a visible deferred backlog.
 
 **The cap is a feature.** What would kill this product is a
-user trained to bulk-approve. Once approval is reflex, the safety model is
-theater.
+user trained to bulk-approve. 
 
 ---
 
@@ -253,7 +252,7 @@ Rejections-with-reasons and convention revisions accumulate into the
 Exceptions log and the standards files — an executable record of what *this
 firm* actually means, assembled as a byproduct of five minutes a day. It
 answers "our standards aren't really written down": **using the product
-writes them.** It is also the part a competitor cannot copy.
+writes them.** 
 
 ---
 
@@ -264,51 +263,3 @@ writes them.** It is also the part a competitor cannot copy.
 | **v1** | Parameter writes + element deletes | nomenclature · misspellings · compliance-check · duplicate-room-numbers · duplicate-marks · identical-instances |
 | **v1.5** | + geometry **read** | overlap-locator · off-axis-lines (as context & rec) · room-not-enclosed diagnosis |
 | **v2** | + geometry write | off-axis snap · simple element creation (e.g. a wall closing a room boundary) |
-
-The ladder tracks the write path, not appetite; everything in the gap ships
-as context & rec. Geometry **read** is asked for now — cheap, enables good
-diagnosis, avoids a v2 blocker. **No locator/viewer:** Speckle and Revit
-auto-locate from element IDs.
-
----
-
-## 9. Scope boundaries
-
-`[TEAMMATE SCOPE: pipeline/infra]` — Revit ↔ Speckle ↔ Origo server
-transport, warning-list import, geometry read, CR round trip (incl. deletes),
-rejection reasons flowing back, phase/hosting data, SQL cache access,
-per-run instrumentation. Live asks: `fleet/README.md`.
-
-`[TEAMMATE SCOPE: server & UI]` — issue panel grouping, CR review surface in
-Revit, dismiss-with-reason, approval telemetry.
-
-`[TEAMMATE SCOPE: GTM / pricing / packaging]`
-
-`[TEAMMATE SCOPE: security, tenancy, model data handling]`
-
-**This repo owns:** task markdowns, deliverable and report formats,
-fleet-wide rules (caps, severity, safety invariants), the standards-file
-format, and the cache/task-agent contract.
-
----
-
-## 10. Raw material for the pitch deck
-
-### The "why" in one line
-
-> Every model checker tells you what's wrong. None of them fix anything —
-> there was no way to hand a fix back to Revit. Speckle's change requests
-> opened that path; agents do the judgment work that fills it.
-
-### Four-beat narrative
-
-1. **Entropy is continuous; cleanup is episodic.** Every firm pays for that
-   gap in crunch weeks before every milestone.
-2. **Detection is commoditized; resolution is untouched.** Warnings pile up
-   untriaged because knowing was never the bottleneck.
-3. **The leftover work is judgment-shaped** — too trivial to schedule, too
-   contextual to script. Newly automatable, for the first time.
-4. **And now deliverable.** Speckle's change requests give a proposed fix
-   somewhere to land — accepted with a click inside Revit. Incumbents stop at
-   a report because a report was all a tool could hand back. **That is the
-   unlock.**
