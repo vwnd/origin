@@ -39,10 +39,16 @@ Try these prompts to see the different features:
 
 ```
 src/
-  server.ts    # Chat agent with tools and scheduling
+  server.ts    # Worker entry: Speckle webhook route + chat agent
   app.tsx      # Chat UI built with Kumo components
   client.tsx   # React entry point
   styles.css   # Tailwind + Kumo styles
+  speckle/
+    config.ts     # Project id, server URL, webhook path (non-secret constants)
+    types.ts      # Webhook payload shape + parsing
+    signature.ts  # HMAC-SHA256 delivery verification
+    client.ts     # GraphQL client (createIssue)
+    webhook.ts    # Delivery handler
 ```
 
 ## What's included
@@ -55,6 +61,54 @@ src/
 - **Debug mode** — toggle in the header to inspect raw message JSON for each message
 - **Kumo UI** — Cloudflare's design system with dark/light mode
 - **Real-time** — WebSocket connection with automatic reconnection and message persistence
+
+## Speckle integration
+
+Scout reacts to Speckle webhooks. Today it does one thing, to prove the pipeline
+end to end: when a new version is published to a model in one specific project,
+it creates a "hello world" issue on that project, pinned to the new version.
+
+### How a delivery flows
+
+1. Speckle POSTs to `/webhooks/speckle` with `{ "payload": { ... } }` and an
+   `X-WEBHOOK-SIGNATURE` header — hex HMAC-SHA256 of the raw body.
+2. `handleSpeckleWebhook` verifies the signature against `SPECKLE_WEBHOOK_SECRET`
+   (401 if it does not match).
+3. Deliveries for other projects, or events other than `commit_create`, are
+   acknowledged with 200 and ignored — Speckle only retries on non-2xx.
+4. For a match, it calls `projectMutations.issues.createIssue` and returns 201.
+
+Speckle's UI shows the trigger as `version_create`, but the value on the wire is
+the legacy name `commit_create` — that is what the code matches on.
+
+### Configuration
+
+Non-secret settings live in `src/speckle/config.ts`:
+
+| Constant               | Meaning                                                        |
+| ---------------------- | -------------------------------------------------------------- |
+| `SPECKLE_PROJECT_ID`   | The only project Scout acts on. **Set this before deploying.** |
+| `SPECKLE_SERVER_URL`   | Speckle server. Change for self-hosted.                        |
+| `SPECKLE_WEBHOOK_PATH` | Path the webhook posts to.                                     |
+
+Secrets are Worker secrets, not config (see `.dev.vars.example`):
+
+```bash
+wrangler secret put SPECKLE_TOKEN          # PAT with the streams:write scope
+wrangler secret put SPECKLE_WEBHOOK_SECRET # secret set on the project webhook
+```
+
+For local development, copy `.dev.vars.example` to `.dev.vars` and fill it in.
+
+### Setting up the webhook in Speckle
+
+In the Speckle project: **Settings → Webhooks → Create webhook**
+
+- **URL** — `https://<your-worker>.workers.dev/webhooks/speckle`
+- **Events** — `version_create`
+- **Secret** — the same value you stored as `SPECKLE_WEBHOOK_SECRET`
+
+You cannot read the secret back after saving it, so store it when you create it.
 
 ## Making it your own
 

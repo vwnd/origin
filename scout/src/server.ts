@@ -10,6 +10,10 @@ import {
   tool
 } from "ai";
 import { z } from "zod";
+import {
+  handleSpeckleWebhook,
+  isSpeckleWebhookRequest
+} from "./speckle/webhook";
 
 export class ChatAgent extends AIChatAgent<Env> {
   maxPersistedMessages = 100;
@@ -206,6 +210,11 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 
 export default {
   async fetch(request: Request, env: Env) {
+    // Speckle webhook deliveries land here before the agent router.
+    if (isSpeckleWebhookRequest(request)) {
+      return await handleSpeckleWebhook(request, env);
+    }
+
     return (
       (await routeAgentRequest(request, env)) ||
       new Response("Not found", { status: 404 })
