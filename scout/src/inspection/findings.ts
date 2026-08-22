@@ -144,3 +144,78 @@ export function renderSummaryIssue(options: {
     description: lines.join("\n")
   };
 }
+
+/**
+ * Collapse findings that describe the same underlying problem seen through
+ * different parameters.
+ *
+ * Revit denormalizes the same string into several parameters — a wall type name
+ * appears in `Type Name`, `Type`, `Family and Type`, `Host` and `Host Id`, each
+ * with a different prefix. Judging parameters independently is what makes the
+ * run cheap and parallel, but it means one misspelling is reported once per
+ * carrier: "Insultation" came back twelve times in a single run.
+ *
+ * Two findings are treated as the same problem when their suspect values
+ * overlap — either an exact match, or one value contained in the other, which
+ * is what catches `"Exterior - ... w Insultation ..."` inside
+ * `"Basic Wall: Exterior - ... w Insultation ..."`.
+ *
+ * The highest-severity member survives and records the other parameters it was
+ * also seen in, so nothing is silently discarded.
+ */
+
+function normalisedValues(finding: Finding): string[] {
+  return finding.evidence
+    .map((item) => item.value.trim().toLowerCase())
+    .filter((value) => value.length > 0);
+}
+
+function describesSameProblem(a: Finding, b: Finding): boolean {
+  const left = normalisedValues(a);
+  const right = normalisedValues(b);
+  if (left.length === 0 || right.length === 0) return false;
+
+  for (const one of left) {
+    for (const other of right) {
+      if (one === other) return true;
+      // Long enough to be meaningful — short values collide by chance.
+      const shorter = one.length <= other.length ? one : other;
+      const longer = one.length <= other.length ? other : one;
+      if (shorter.length >= 12 && longer.includes(shorter)) return true;
+    }
+  }
+  return false;
+}
+
+export function collapseDuplicates(findings: Finding[]): Finding[] {
+  const kept: Finding[] = [];
+  const alsoSeenIn: string[][] = [];
+
+  for (const finding of sortFindings(findings)) {
+    const index = kept.findIndex((existing) =>
+      describesSameProblem(existing, finding)
+    );
+
+    if (index === -1) {
+      kept.push(finding);
+      alsoSeenIn.push([]);
+      continue;
+    }
+    // sortFindings put the highest severity first, so the survivor is already
+    // the most severe statement of the problem.
+    if (finding.keyPath !== kept[index].keyPath) {
+      alsoSeenIn[index].push(finding.keyPath);
+    }
+  }
+
+  return kept.map((finding, index) => {
+    const others = [...new Set(alsoSeenIn[index])];
+    if (others.length === 0) return finding;
+    return {
+      ...finding,
+      summary: `${finding.summary} (also present in ${others.length} related ${
+        others.length === 1 ? "parameter" : "parameters"
+      }: ${others.map((path) => path.split(".").pop()).join(", ")})`
+    };
+  });
+}

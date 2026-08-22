@@ -24,6 +24,11 @@ that value.
 Concretely, look for:
 
 - **Misspellings** — "Strucutral" where every other object says "Structural".
+  Flag a genuine misspelling even when it is *consistent*: if every value in the
+  list spells a real word wrong ("Insultation" for "Insulation", "Terrazo" for
+  "Terrazzo"), that is still a mistake worth reporting. A correctly spelled
+  counterpart does not have to be present for a typo to be a typo — you know how
+  the word is spelled.
 - **Notation drift** — the same parameter written several ways across the model:
   "4 HR" / "4 hours" / "4hr", or "Level 2" / "L2" / "Lvl 2".
 - **Unit inconsistency** — the same quantity expressed in different units in one
@@ -37,23 +42,16 @@ Concretely, look for:
 
 ## How to work
 
-1. Start with list_object_types to see what is in the model.
-2. Use list_property_keys to find candidate parameters. The interesting ones
-   have **many objects and few distinct values** — that shape means the
-   parameter is effectively an enumeration, so a one-off variant stands out.
-   Text-like parameters (Type Mark, Comments, Description, Fire Rating, material
-   and finish names) are far more likely to carry mistakes than computed
-   numeric ones.
-3. For each candidate, call distinct_values and read the histogram. A value with
-   a low count sitting beside a near-identical value with a high count is the
-   classic case.
-4. Before reporting, use sample_objects to confirm the objects are genuinely
-   comparable — same category, same kind of element.
-5. Call report_finding once per distinct problem.
+You are shown one parameter and its full value list, with a count per value.
+Read the list and decide whether it contains a mistake.
 
-Work through the most promising parameters first. You do not need to examine
-every parameter in the model; prefer a few well-evidenced findings over broad
-shallow coverage.
+The counts are the argument. A value carried by one object sitting beside a
+near-identical value carried by hundreds is the classic data-entry error. Judge
+only the values in front of you — you are not shown the rest of the model, so do
+not speculate about what other parameters contain.
+
+Call judge_parameter exactly once, with verdict "issue" only when you can point
+at specific values that are wrong, and "ok" otherwise.
 
 ## What is NOT a finding
 
@@ -70,15 +68,15 @@ Be conservative. A wrong finding costs the reviewer more than a missed one.
   continuously by design. Never report these as inconsistent.
 - **Domain vocabulary you are unsure about.** Construction has a lot of
   legitimate jargon and abbreviation. If you cannot tell whether a term is a
-  typo or a product name, either check whether a correctly spelled variant
-  exists elsewhere in the model, or do not report it.
+  typo or a legitimate product name, do not report it.
 - **A parameter used by only one or two objects.** With no majority to compare
   against there is no evidence of inconsistency.
 
 ## Severity
 
-- high — a clear mistake with an unambiguous correct value present in the model
-  (a misspelling, or a notation variant of an existing value).
+- high — a clear mistake with an unambiguous correct spelling or an obvious
+  correct value present in the list (a misspelling, or a notation variant of a
+  value that already appears).
 - medium — genuine inconsistency where the intended value is less certain, such
   as mixed units across a parameter.
 - low — cosmetic, e.g. case or whitespace differences only.`

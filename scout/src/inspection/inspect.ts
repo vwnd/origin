@@ -34,6 +34,17 @@ const MAX_TOKENS = 1024;
 const CONCURRENCY = 6;
 
 /**
+ * Values shown in a single request. A parameter with more than this is split
+ * across several, each judged independently.
+ *
+ * High-cardinality parameters cannot simply be skipped — `Type Name` holds 356
+ * distinct values and three real findings — but sending 356 values in one
+ * request makes it both expensive and easy for the model to lose the odd one
+ * out among the noise. Splitting keeps every request small.
+ */
+const VALUES_PER_REQUEST = 120;
+
+/**
  * Hard ceiling per run, estimated from usage as it accrues. When it trips the
  * run stops and reports what it has, rather than quietly spending on.
  */
@@ -227,9 +238,15 @@ export async function runInstruction(options: {
     }
   ];
 
-  const judgeOne = async (candidate: (typeof candidates)[number]) => {
-    const values = histograms[candidate.keyPath] ?? [];
-    if (values.length < 2) return;
+  type WorkItem = {
+    candidate: (typeof candidates)[number];
+    values: { value: string | null; count: number }[];
+    part: number;
+    parts: number;
+  };
+
+  const judgeOne = async (item: WorkItem) => {
+    const { candidate, values } = item;
 
     const response = await client.messages.create({
       model: MODEL,
@@ -244,6 +261,9 @@ export async function runInstruction(options: {
             `Model: ${options.modelName ?? "unknown"}`,
             `Parameter: ${candidate.keyPath}`,
             `Carried by ${candidate.objects} objects, ${candidate.distinctValues} distinct values.`,
+            item.parts > 1
+              ? `Showing part ${item.part} of ${item.parts} of the value list; judge only the values below.`
+              : "",
             "",
             "Values (count x value):",
             renderHistogram(values)
@@ -298,25 +318,48 @@ export async function runInstruction(options: {
     });
   };
 
+  // Expand each candidate into one work item per chunk of its value list.
+  const queue: WorkItem[] = [];
+  for (const candidate of candidates) {
+    const values = histograms[candidate.keyPath] ?? [];
+    if (values.length < 2) continue;
+    const parts = Math.ceil(values.length / VALUES_PER_REQUEST);
+    for (let part = 0; part < parts; part++) {
+      queue.push({
+        candidate,
+        values: values.slice(
+          part * VALUES_PER_REQUEST,
+          (part + 1) * VALUES_PER_REQUEST
+        ),
+        part: part + 1,
+        parts
+      });
+    }
+  }
+
+  logger.info("work_planned", {
+    candidates: candidates.length,
+    requests: queue.length
+  });
+
   // Fixed worker pool over a shared queue. Each task is independent, so this is
   // pure throughput. The cost cap is checked between tasks, so a run cannot
   // overshoot by more than the requests already in flight.
-  const queue = [...candidates];
   const worker = async () => {
     for (;;) {
       if (estimateCost(usage) >= MAX_RUN_COST_USD) {
         stoppedBecause = "cost_cap";
         return;
       }
-      const candidate = queue.shift();
-      if (!candidate) return;
+      const item = queue.shift();
+      if (!item) return;
       try {
-        await judgeOne(candidate);
+        await judgeOne(item);
       } catch (error) {
         failed++;
         firstError ??= errorMessage(error);
         logger.warn("judge_failed", {
-          keyPath: candidate.keyPath,
+          keyPath: item.candidate.keyPath,
           error: errorMessage(error)
         });
         // Don't grind through the remaining parameters on a systemic failure.

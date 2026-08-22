@@ -12,10 +12,10 @@ import { loadEnabledInstructions } from "../instructions";
 import { loadVersionIntoIndex } from "./loader";
 import { runInstruction } from "./inspect";
 import {
+  collapseDuplicates,
   extractFingerprints,
   fingerprint,
   renderSummaryIssue,
-  sortFindings,
   type Finding
 } from "./findings";
 import type { InspectionAgent } from "./agent";
@@ -138,7 +138,8 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
         estimatedCostUsd += result.usage.estimatedCostUsd;
       }
 
-      return { findings: sortFindings(findings), estimatedCostUsd };
+      // Collapse the same problem seen through denormalized parameters.
+      return { findings: collapseDuplicates(findings), estimatedCostUsd };
     });
 
     // Dedupe against what is already open on the project, so republishing a

@@ -2,6 +2,7 @@ import { getAgentByName } from "agents";
 import { loadEnabledInstructions } from "../instructions";
 import { runInstruction } from "./inspect";
 import {
+  collapseDuplicates,
   extractFingerprints,
   fingerprint,
   renderSummaryIssue,
@@ -214,7 +215,9 @@ export async function runInspect(url: URL, env: Env): Promise<Response> {
     );
   }
 
-  const findings = sortFindings(results.flatMap((result) => result.findings));
+  const findings = collapseDuplicates(
+    results.flatMap((result) => result.findings)
+  );
   const fingerprinted = await Promise.all(
     findings.map(async (finding) => ({
       fingerprint: await fingerprint(finding),

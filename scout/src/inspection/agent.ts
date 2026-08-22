@@ -297,11 +297,14 @@ export class InspectionAgent extends Agent<Env> {
   > {
     this.ensureTables();
     const minObjects = options.minObjects ?? 5;
-    // Generous: name-like parameters (Type Name, Description) are legitimately
-    // high-cardinality, and that is exactly where misspellings hide. Tightening
-    // this to enum-like counts excluded three of the first run's seven findings.
-    // The histogram sent per parameter is capped separately instead.
-    const maxDistinct = options.maxDistinct ?? 200;
+    // Name-like parameters are legitimately high-cardinality and that is exactly
+    // where misspellings hide: `Type Name` has 356 distinct values and held
+    // three real findings ("Insultation" x111, "Terrazo", a doubled inch mark).
+    // Any cap low enough to mean "enum-like" excludes them, so the ceiling is
+    // only a runaway guard — `maxDistinctRatio` is what actually rejects
+    // identifiers, and it keeps Type Name at a ratio of 0.05. Long value lists
+    // are split across several requests rather than dropped.
+    const maxDistinct = options.maxDistinct ?? 2000;
     const maxDistinctRatio = options.maxDistinctRatio ?? 0.6;
     const limit = Math.min(options.limit ?? 250, 500);
 
@@ -334,7 +337,7 @@ export class InspectionAgent extends Agent<Env> {
    */
   async histogramsFor(
     keyPaths: string[],
-    valuesPerKey = 40
+    valuesPerKey = 400
   ): Promise<Record<string, ValueCount[]>> {
     this.ensureTables();
     if (keyPaths.length === 0) return {};
