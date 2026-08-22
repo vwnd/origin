@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, RefreshCw } from "lucide-react";
+import { Fragment, useCallback, useEffect, useState } from "react";
+import { ArrowUpRight, ChevronRight, RefreshCw } from "lucide-react";
 import { api, type Issue } from "@/lib/api";
+import { parseFindings, type ParsedFinding } from "@/lib/findings";
+import { cn } from "@/lib/utils";
 import {
   Badge,
   Button,
@@ -33,16 +35,70 @@ function relativeTime(iso: string): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+const SEVERITY_DOT: Record<ParsedFinding["severity"], string> = {
+  high: "bg-red-500",
+  medium: "bg-amber-500",
+  low: "bg-muted-foreground/40"
+};
+
 /**
- * Findings counted from the issue body.
+ * The findings of one issue, shown inline.
  *
- * Scout writes numbered lines, so this reads the highest number rather than
- * counting matches — a wrapped line would inflate a naive count.
+ * Deliberately dense: the counts are the argument — "1 object says this, 500
+ * say that" — so they lead each evidence chip and the prose stays to one line.
  */
-function findingCount(raw: string | null): number | null {
-  if (!raw) return null;
-  const numbers = [...raw.matchAll(/^(\d+)\.\s+\[/gm)].map((m) => Number(m[1]));
-  return numbers.length ? Math.max(...numbers) : null;
+function FindingList({ findings }: { findings: ParsedFinding[] }) {
+  if (findings.length === 0) {
+    return (
+      <p className="px-4 py-4 text-sm text-muted-foreground">
+        No findings recorded in this issue.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-border">
+      {findings.map((finding) => (
+        <li key={finding.index} className="flex gap-3 px-4 py-2.5">
+          <span
+            className={cn(
+              "mt-1.5 size-2 shrink-0 rounded-full",
+              SEVERITY_DOT[finding.severity]
+            )}
+            title={finding.severity}
+          />
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-sm leading-snug">{finding.summary}</p>
+
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+              {finding.parameter ? (
+                <span
+                  className="font-mono text-muted-foreground"
+                  title={finding.keyPath ?? undefined}
+                >
+                  {finding.parameter}
+                </span>
+              ) : null}
+
+              {finding.evidence.map((item) => (
+                <span
+                  key={`${item.value}-${item.count}`}
+                  className="rounded bg-muted px-1.5 py-0.5 font-mono"
+                >
+                  <span className="text-muted-foreground">{item.count}x</span>{" "}
+                  {item.value || "(empty)"}
+                </span>
+              ))}
+
+              {finding.suggestion ? (
+                <span className="text-emerald-600">{finding.suggestion}</span>
+              ) : null}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function Inbox({ refreshKey }: { refreshKey: number }) {
@@ -50,6 +106,7 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -114,6 +171,7 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8" />
                 <TableHead className="w-24">Issue</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead className="w-28">Findings</TableHead>
@@ -124,44 +182,74 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
             </TableHeader>
             <TableBody>
               {issues.map((issue) => {
-                const findings = findingCount(issue.rawDescription);
+                const findings = parseFindings(issue.rawDescription);
+                const isOpen = expanded === issue.id;
                 return (
-                  <TableRow key={issue.id}>
-                    <TableCell className="font-mono text-xs">
-                      {issue.identifier}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {issue.title ?? "Untitled"}
-                    </TableCell>
-                    <TableCell>
-                      {findings === null ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <Badge variant="secondary">{findings}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant(issue.status)}>
-                        {issue.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {relativeTime(issue.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      {projectId ? (
-                        <a
-                          href={`${SPECKLE_BASE}/projects/${projectId}/issues/${issue.id}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                          aria-label={`Open ${issue.identifier} in Speckle`}
+                  <Fragment key={issue.id}>
+                    <TableRow
+                      className="cursor-pointer"
+                      onClick={() => setExpanded(isOpen ? null : issue.id)}
+                    >
+                      <TableCell>
+                        <button
+                          type="button"
+                          aria-expanded={isOpen}
+                          aria-label={`${isOpen ? "Hide" : "Show"} findings for ${issue.identifier}`}
+                          className="flex items-center text-muted-foreground"
                         >
-                          <ArrowUpRight className="size-4" />
-                        </a>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
+                          <ChevronRight
+                            className={cn(
+                              "size-4 transition-transform",
+                              isOpen && "rotate-90"
+                            )}
+                          />
+                        </button>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {issue.identifier}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {issue.title ?? "Untitled"}
+                      </TableCell>
+                      <TableCell>
+                        {findings.length === 0 ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <Badge variant="secondary">{findings.length}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusVariant(issue.status)}>
+                          {issue.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {relativeTime(issue.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        {projectId ? (
+                          <a
+                            href={`${SPECKLE_BASE}/projects/${projectId}/issues/${issue.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center text-muted-foreground hover:text-foreground"
+                            aria-label={`Open ${issue.identifier} in Speckle`}
+                          >
+                            <ArrowUpRight className="size-4" />
+                          </a>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+
+                    {isOpen ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={7} className="bg-muted/30 p-0">
+                          <FindingList findings={findings} />
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </TableBody>
