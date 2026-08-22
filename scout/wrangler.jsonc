@@ -4,18 +4,13 @@
   "main": "src/server.ts",
   "compatibility_date": "2026-06-11",
   "compatibility_flags": ["nodejs_compat"],
-  "ai": { "binding": "AI", "remote": true },
   "assets": {
     "directory": "./public",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/agents/*", "/oauth/*", "/webhooks/*", "/debug/*", "/api/*"]
+    "run_worker_first": ["/agents/*", "/webhooks/*", "/debug/*", "/api/*"]
   },
   "durable_objects": {
     "bindings": [
-      {
-        "class_name": "ChatAgent",
-        "name": "ChatAgent"
-      },
       {
         "class_name": "InspectionAgent",
         "name": "InspectionAgent"
@@ -38,6 +33,12 @@
     {
       "new_sqlite_classes": ["EventsAgent"],
       "tag": "v3"
+    },
+    {
+      // The starter's chat agent, removed. Named here so its stored state is
+      // dropped rather than orphaned.
+      "deleted_classes": ["ChatAgent"],
+      "tag": "v4"
     }
   ],
   // Streaming and parsing a large version is CPU-bound; the default 30s is not

@@ -15,36 +15,6 @@ import { listRuns } from "./runs";
 
 const API_PREFIX = "/api/";
 
-/**
- * Writes are gated; reads are not.
- *
- * A scout body is a prompt: whoever can write one decides what the inspector
- * looks for and what lands as an issue on a real Speckle project. On a public
- * URL that cannot be anonymous, so mutations require `x-scout-token` matching
- * the `SCOUT_ADMIN_TOKEN` secret (falling back to `SCOUT_DEBUG_TOKEN` so an
- * existing deployment stays protected without a second secret).
- *
- * Compared with a constant-time check so the token cannot be recovered a byte
- * at a time. Fails closed: with neither secret set, nothing can be written.
- *
- * Reads stay open because this is a demo surface. They do expose issue titles
- * and bodies for the configured project, so put Cloudflare Access in front of
- * the Worker before pointing it at anything non-public.
- */
-const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
-async function isAuthorisedWrite(request: Request, env: Env): Promise<boolean> {
-  const expected = env.SCOUT_ADMIN_TOKEN || env.SCOUT_DEBUG_TOKEN;
-  if (!expected) return false;
-
-  // Cloudflare Access, when configured, authenticates ahead of the Worker.
-  if (request.headers.get("cf-access-jwt-assertion")) return true;
-
-  const presented = request.headers.get("x-scout-token");
-  if (!presented) return false;
-  return await timingSafeEqualStrings(presented, expected);
-}
-
 export function isApiRequest(request: Request): boolean {
   return new URL(request.url).pathname.startsWith(API_PREFIX);
 }
@@ -54,6 +24,33 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { "cache-control": "no-store" }
   });
+}
+
+/**
+ * Whether writing a scout requires a token.
+ *
+ * Off for the demo. It is a real gate when on: a scout body is a prompt, so
+ * whoever can write one decides what the inspector looks for and what lands as
+ * an issue on a real project — not something to leave anonymous on a public URL
+ * beyond a demo. Put Cloudflare Access in front, or flip this back to `true`
+ * and set `SCOUT_ADMIN_TOKEN`, before this points at anything that matters.
+ */
+const REQUIRE_WRITE_TOKEN = false;
+
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+async function isAuthorisedWrite(request: Request, env: Env): Promise<boolean> {
+  if (!REQUIRE_WRITE_TOKEN) return true;
+
+  const expected = env.SCOUT_ADMIN_TOKEN || env.SCOUT_DEBUG_TOKEN;
+  if (!expected) return false;
+
+  // Cloudflare Access, when configured, authenticates ahead of the Worker.
+  if (request.headers.get("cf-access-jwt-assertion")) return true;
+
+  const presented = request.headers.get("x-scout-token");
+  if (!presented) return false;
+  return await timingSafeEqualStrings(presented, expected);
 }
 
 export async function handleApi(request: Request, env: Env): Promise<Response> {

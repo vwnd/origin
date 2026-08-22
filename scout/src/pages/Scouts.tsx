@@ -2,13 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  api,
-  setAdminToken,
-  UnauthorizedError,
-  type Scout,
-  type ScoutMeta
-} from "@/lib/api";
+import { api, type Scout, type ScoutMeta } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -106,25 +100,6 @@ export function Scouts() {
     setDraft({ id: "", title: "", body: NEW_SCOUT_BODY, enabled: true });
   };
 
-  /**
-   * Writes are token-gated. Rather than a login screen, ask for the token the
-   * first time a write is refused and remember it.
-   */
-  const withAuthRetry = async (attempt: () => Promise<void>) => {
-    try {
-      await attempt();
-    } catch (cause) {
-      if (!(cause instanceof UnauthorizedError)) throw cause;
-      const token = prompt("Write token (SCOUT_ADMIN_TOKEN) to save changes:");
-      if (!token) {
-        toast.error("Not saved — a write token is required");
-        return;
-      }
-      setAdminToken(token.trim());
-      await attempt();
-    }
-  };
-
   const save = async () => {
     if (!draft) return;
     if (!draft.title.trim()) {
@@ -133,7 +108,7 @@ export function Scouts() {
     }
     setSaving(true);
     try {
-      await withAuthRetry(async () => {
+      {
         const saved = isNew
           ? await api.createScout({
               // Fall back to the title so the author need not invent a slug;
@@ -160,7 +135,7 @@ export function Scouts() {
           current ? { ...current, id: saved.scout.id } : current
         );
         await loadList();
-      });
+      }
     } catch (cause) {
       toast.error("Could not save", {
         description: cause instanceof Error ? cause.message : String(cause)
@@ -174,14 +149,14 @@ export function Scouts() {
     if (!selected) return;
     if (!confirm(`Delete "${selected.title}"?`)) return;
     try {
-      await withAuthRetry(async () => {
+      {
         await api.deleteScout(selected.id);
         toast.success("Scout deleted");
         setSelected(null);
         setDraft(null);
         const scouts = await loadList();
         if (scouts.length > 0) await open(scouts[0].id);
-      });
+      }
     } catch (cause) {
       toast.error("Could not delete", {
         description: cause instanceof Error ? cause.message : String(cause)
