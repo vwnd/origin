@@ -1,9 +1,8 @@
 # Daily Report Format
 
-The single artifact a BIM manager reads alongside the day's CRs. It carries
-everything that is *not* a change request: diagnose-only findings, flagged-but-
-not-proposed items, convention revisions, and backlog totals. Target read time:
-two minutes.
+The single artifact a BIM manager reads alongside the day's CRs: everything
+that is *not* a change request — diagnose-only findings, flagged items,
+convention revisions, backlog totals. Target read time: two minutes.
 
 ## Location
 
@@ -13,7 +12,7 @@ fleet/state/reports/YYYY-MM-DD.md
 
 ## Structure
 
-Sections appear in this order; empty sections are omitted. Findings within each
+Sections in this order; empty sections omitted. Findings within each
 section follow fleet-rules.md severity ordering.
 
 ```markdown
@@ -58,20 +57,20 @@ Ordered as delivered for review, severity first.
 ## Section rules
 
 - **Header summary line** — always present: CRs drafted, diagnose findings,
-  flagged count, backlog total, convention revisions. This is the at-a-glance row.
-- **Compliance findings** — always the top section when non-empty (severity
-  rank 1). Tag `[HIGH]`/`[MED]` per the task's confidence gate.
-- **Change requests drafted** — one line per CR: id, task, scope, what changes,
-  count. The full detail lives in the CR itself; this is the index.
-- **Context & rec reports issued** — one line per report: id, task, location,
-  recommended action. Full detail (dissection, measurements) lives in the
-  report on the issue panel; this is the index. Follows the CR section.
+  flagged count, backlog total, convention revisions.
+- **Compliance findings** — top section when non-empty (severity rank 1).
+  Tag `[HIGH]`/`[MED]` per the task's confidence gate.
+- **Change requests drafted** — one line per CR: id, task, scope, what
+  changes, count. Full detail lives in the CR; this is the index.
+- **Context & rec reports issued** — one line per report: id, task,
+  location, recommended action. Full detail lives on the issue panel.
+  Follows the CR section.
 - **Flagged, no CR** — medium-confidence detections and uncertain exception
-  matches. These exist so nothing is silently dropped, and so the manager can
-  promote one to a fix by tightening a rule.
-- **Convention revisions** — required whenever 3+ rejections shared a pattern.
-  States old reading, new reading, and the suggested standards-file edit.
+  matches, so nothing is silently dropped and the manager can promote one
+  by tightening a rule.
+- **Convention revisions** — required whenever 3+ rejections shared a
+  pattern: old reading, new reading, suggested standards-file edit.
 - **Deferred backlog** — totals for anything beyond daily caps. Silent
   truncation is forbidden: if a cap dropped work, the number appears here.
-- **Data gaps / errors** — anything the fleet could not check, so absence of a
-  finding is never mistaken for a pass.
+- **Data gaps / errors** — anything the fleet could not check, so absence
+  of a finding is never mistaken for a pass.

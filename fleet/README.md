@@ -1,122 +1,111 @@
 # Origo Agent Fleet
 
-Automated daily maintenance for Revit models — "Dependabot for Revit." The fleet
-detects model-health and semantic issues, drafts small reviewable change requests
-(CRs), and delivers them for human approval in Revit. Nothing changes a model
-without a BIM manager approving it.
+Automated daily maintenance for Revit models — "Dependabot for Revit." The
+fleet detects model-health and semantic issues, drafts small reviewable
+change requests (CRs), and delivers them for human approval in Revit.
+Nothing changes a model without a BIM manager approving it.
 
-The value is two-fold:
-
-1. **Pre-drafted fixes** — small, reviewable CRs, approved by a human.
-2. **Pre-done investigation** — for issues the fleet can't (or shouldn't) fix,
-   it still saves the energy of *locating, inspecting, and analyzing*: the issue
-   arrives found, dissected, and with a recommended action, as a context &
-   recommendation report (see formats/context-rec-report.md).
-
-Who detects what, and the deliverable class per issue: see scope-map.md.
+The value is two-fold: **pre-drafted fixes** (small CRs, human-approved),
+and **pre-done investigation** — issues the fleet can't or shouldn't fix
+still arrive located, dissected, and with a recommended action, as a
+context & recommendation report (formats/context-rec-report.md). Who
+detects what, and the deliverable class per issue: scope-map.md.
 
 ## Pipeline
 
-Revit → Speckle → Origo server → **agent fleet (this directory)** → Origo server
-→ Speckle → Revit change requests → human approval in Revit → model updated and
-pushed back. The fleet runs daily as background maintenance.
+Revit → Speckle → Origo server → **agent fleet (this directory)** → Origo
+server → Speckle → Revit change requests → human approval in Revit → model
+updated and pushed back. Runs daily as background maintenance.
 
 ## Directory map
 
 ```
 fleet/
-  README.md              this file
-  fleet-rules.md         global runner rules: batch cap, severity ordering, safety invariants
-  scope-map.md           who detects what, deliverable class per issue, design principles
+  README.md
+  fleet-rules.md         global runner rules: caps, severity ordering, safety invariants
+  scope-map.md           who detects what, deliverable class per issue
   runtime.md             cache agent + task agents (A/B) execution structure
-  tasks/                 one markdown file per task — the customizable product surface
+  tasks/                 one md per task — the customizable product surface
     nomenclature.md
+    misspellings.md
     compliance-check.md
     duplicate-room-numbers.md
     duplicate-marks.md
     identical-instances.md
-    overlap-locator.md       wall & line overlaps → context & rec (v1.5, geo read)
-    off-axis-lines.md        slightly off-axis lines/ref planes (v1.5 context & rec → v2 snap)
-    archive/                 parked tasks (lower value-add for now; skeleton kept current)
+    overlap-locator.md       wall & line overlaps → context & rec (v1.5)
+    off-axis-lines.md        off-axis lines/planes (v1.5 context & rec → v2 snap)
+    archive/                 parked tasks; skeleton kept current
       duplicate-doors.md
-  formats/               shared file-format specs
-    standards-file.md    the rules files a firm authors (naming + compliance), with templates
+  formats/
+    standards-file.md    the rules files a firm authors, with templates
     exceptions-log.md    shared rejected-fix log all tasks must respect
     daily-report.md      the daily report the runner assembles
-    context-rec-report.md  the [context and rec] deliverable for issues fixed manually
-  state/                 runner-maintained state (exceptions log, reports) — created at runtime
+    context-rec-report.md  the [context and rec] deliverable
+  state/                 runner-maintained state — created at runtime
 ```
 
 ## How the runner consumes tasks
 
-Every file in `tasks/` uses the same eight sections, so the runner treats them
-uniformly: **Objective, Inputs, Detection, Fix policy, Confidence gate, Change
-request format, Feedback handling, Hard limits.** Hard limits live in the task
-file — visible to customizing firms — not hidden in the runner.
+Every task file uses the same eight sections: **Objective, Inputs,
+Detection, Fix policy, Confidence gate, Change request format, Feedback
+handling, Hard limits.** Hard limits live in the task file — visible to
+customizing firms — not hidden in the runner.
 
-Detection is **warnings-first** (fleet-rules.md): where Revit natively warns
-about the issue, the imported warning list is the detection seed and the agent
-adds the judgment on top — triage, keeper calls, fix drafting, packaging. Only
-semantic tasks detect from scratch.
+Detection is **warnings-first** (fleet-rules.md): where Revit natively
+warns, the imported warning list is the seed and the agent adds the
+judgment — triage, keeper calls, fix drafting, packaging. Only semantic
+tasks detect from scratch.
 
-At run time, each task's **Inputs section is a query contract** (runtime.md): a
-cache agent downloads from Speckle once per run, and the task agent SQL-queries
-it for exactly the fields and filters its Inputs list — small subsets, short
-agent time.
+Each task's **Inputs section is a query contract** (runtime.md): a cache
+agent downloads from Speckle once per run; the task agent SQL-queries it
+for exactly the fields and filters its Inputs list.
 
 ## Fix-policy classes
 
-- **Auto-propose** — deterministic fix; the agent adds rationale and a confidence call.
-- **Suggest-with-options** — judgment fix; the agent proposes with a stated
-  preference, max 2 options.
-- **Diagnose-only** — frequently a design condition in progress, not an error.
-  Never auto-fix; a precise diagnosis is the deliverable.
-- **[context and rec]** — the fix must happen by hand in Revit, so the
-  deliverable is a context & recommendation report: element IDs (Speckle/Revit
-  auto-locate from them), dissection, recommended action. The fleet does the
-  finding and the judgement; the user does the clicking.
+- **Auto-propose** — deterministic fix; the agent adds rationale and a
+  confidence call.
+- **Suggest-with-options** — judgment fix; stated preference, max 2 options.
+- **Diagnose-only** — often a design condition in progress, not an error.
+  Never auto-fix; the precise diagnosis is the deliverable.
+- **[context and rec]** — the fix must happen by hand in Revit; the
+  deliverable is a context & recommendation report: element IDs
+  (Speckle/Revit auto-locate from them), dissection, recommended action.
 
 ## Safety model
 
 The change-request-with-human-approval flow is the core safety model. Every
 design decision protects it:
 
-- Daily batch cap and severity ordering keep the review load at ~5 minutes so
+- Daily batch cap and severity ordering keep review at ~5 minutes so
   approvals stay considered, never bulk-rubber-stamped.
 - No CR ships without a rationale a BIM manager can evaluate in one read.
 - Rejected CRs feed the Exceptions log; a rejected fix is never re-proposed.
-- v1 writes are **parameter writes and element deletes only** — both are simple
-  operations a reviewer can fully evaluate from the CR. Geometry modification
-  and creation are deferred to v2 — see fleet-rules.md.
+- v1 writes are **parameter writes and element deletes only** — operations
+  a reviewer can fully evaluate from the CR. Geometry modification and
+  creation are deferred to v2 (fleet-rules.md).
 
 ## Customizing for a firm
 
-The task markdowns and the standards files are the product surface a firm edits:
-
-1. Author `/standards/naming.md` and `/standards/compliance.md` per
-   [formats/standards-file.md](formats/standards-file.md) — plain markdown a BIM
-   manager writes, no schema to learn.
-2. Adjust per-task hard limits (caps, batch sizes) directly in `tasks/*.md`.
-3. Seed `state/exceptions.md` with known intentional deviations so the fleet
-   never flags them.
+1. Adjust the starter files in /standards/ (naming.md, compliance.md) —
+   plain markdown a BIM manager edits, no schema. Format and templates:
+   formats/standards-file.md.
+2. Adjust per-task hard limits (caps, batch sizes) in tasks/*.md.
+3. Seed state/exceptions.md with known intentional deviations.
 
 ## Open infra dependencies
 
-- Geometry **read** access in the Origo → agent data feed (room boundary loops,
-  wall location lines, instance placement points) — needed for v1.5 tasks and
-  for identical-instance detection.
-- Rejected CRs must flow back to the agent layer with the rejection reason (or
-  at minimum the reject event) — the Exceptions log and convention-revision
-  loop depend on it.
-- **Revit warning import** in the Origo → agent data feed (warning type,
-  message, element ids, ideally with each sync) — most non-semantic tasks seed
-  detection from it instead of re-implementing what Revit already catches.
+- **Revit warning import** in the Origo → agent feed (type, message,
+  element ids, ideally per sync) — most non-semantic tasks seed from it.
+- Geometry **read** access (room boundary loops, wall location lines,
+  placement points) — v1.5 tasks and identical-instance detection.
+- Rejected CRs flowing back with the rejection reason (or at minimum the
+  reject event) — the Exceptions log and convention-revision loop depend
+  on it.
 - Phase/hosting data through Speckle — instance dedup needs it.
-- Element **delete** operations in the CR round trip (alongside parameter
-  writes) — identical-instances proposes deletes in v1.
-- SQL-queryable access to the cached Speckle download (the cache agent's
-  serving layer — runtime.md), plus per-run instrumentation (queries issued,
-  subset sizes, agent time) to feed the assess-then-automate decision.
-- **Issue panel grouping**: the panel should group issues that can be fixed or
-  inspected conveniently in batch — by proposed-action type, then level — and
-  feed dismiss-with-reason back to the agent layer like CR rejections.
+- Element **delete** operations in the CR round trip — identical-instances
+  proposes deletes in v1.
+- SQL-queryable access to the cached Speckle download (runtime.md), plus
+  per-run instrumentation (queries, subset sizes, agent time) to feed the
+  assess-then-automate decision.
+- **Issue panel grouping** by proposed-action type, then level, with
+  dismiss-with-reason feeding back like CR rejections.

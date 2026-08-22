@@ -1,18 +1,17 @@
 # Context & Recommendation Report Format ([context and rec])
 
-The deliverable for issues the fleet cannot fix via change request: a context
-analysis and recommendation report that supports the user's own decision in
-Revit/Speckle. The value: even without a CR, the fleet saves the energy of
-**locating, inspecting, and analyzing** — the user arrives at the issue with
-it found, dissected, and with a recommended action.
+The deliverable for issues the fleet cannot fix via change request: a
+context analysis and recommendation supporting the user's own fix in
+Revit/Speckle. Even without a CR, the fleet saves the energy of
+**locating, inspecting, and analyzing** — the issue arrives found,
+dissected, and with a recommended action.
 
 Produced by [context and rec] tasks (overlap-locator, off-axis-lines) and
-surfaced on the server's issue-management panel alongside CRs.
+surfaced on the server's issue panel alongside CRs.
 
-**No locator/viewer.** Screenshot/viewer generation is out of scope for this
-project — Speckle and Revit already point to an issue's location automatically
-from its element IDs. A report carries the IDs and the analysis; the tools do
-the pointing.
+**No locator/viewer.** Screenshot/viewer generation is out of scope —
+Speckle and Revit auto-locate from element IDs. A report carries the IDs
+and the analysis; the tools do the pointing.
 
 ## Location
 
@@ -43,34 +42,29 @@ disposable one.)
 
 ### Field rules
 
-- **Elements/Where** — element IDs (Speckle/Revit auto-locate from them) plus
-  level and nearest grid cell for human orientation when reading the report
-  away from the model.
-- **Context** is one short paragraph of dissection: what, extent (measured,
-  from geometry inference), and likely cause when recent-change data
-  supports it.
-- **Recommendation** is a concrete action, one read long, stating why the
+- **Elements/Where** — element IDs (auto-locate from them) plus level and
+  nearest grid cell for orientation when reading away from the model.
+- **Context** — one short paragraph: what, measured extent, likely cause
+  when recent-change data supports it.
+- **Recommendation** — a concrete action, one read long, stating why the
   kept element is the keeper. Every report has one — a report without a
   recommendation is just a warning, which Revit already has.
 
 ## Panel grouping (UI note)
 
-The issue panel should group reports so the user can batch through similar
-work in one Revit sitting:
+Group reports so the user batches similar work in one Revit sitting:
 
-- Group by **recommended-action type first** ("delete leftover line" × 6,
-  "review wall join" × 2), then by **level** — same action + same level is
-  one batch of identical hand-motions.
+- By **recommended-action type first** ("delete leftover line" × 6, "review
+  wall join" × 2), then by **level** — same action + same level is one
+  batch of identical hand-motions.
 - Same severity ordering as CRs (fleet-rules.md) between groups.
 - Each report gets a resolve/dismiss control; dismiss-with-reason feeds the
   Exceptions log exactly like a CR rejection.
-- Reports and CRs touching the same elements sit adjacent, not interleaved
-  with unrelated issues.
+- Reports and CRs touching the same elements sit adjacent.
 
 ## Caps and reporting
 
-- [context and rec] reports have their own daily cap (fleet-rules.md),
-  separate from the CR cap — they don't consume it but compete for the same
-  human attention.
-- Every report is indexed in the daily report; overflow beyond the cap goes
-  to the deferred backlog with totals, same as CRs.
+- Reports have their own daily cap (fleet-rules.md), separate from the CR
+  cap — they don't consume it but compete for the same attention.
+- Every report is indexed in the daily report; overflow goes to the
+  deferred backlog with totals, same as CRs.

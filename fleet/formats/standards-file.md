@@ -1,10 +1,10 @@
 # Standards File Format
 
-The rules files a firm authors — the artifact that turns a BIM execution plan
-into something the fleet enforces. Design constraint: **a BIM manager must be
-able to write one in plain markdown in under 20 minutes.** No schema, no YAML,
-no JSON. The agent's job is to interpret intent, including semantic equivalence
-("4 HR" means "4 hours"); the firm's job is only to state the rules.
+The rules files a firm authors — the artifact that turns a BIM execution
+plan into something the fleet enforces. Design constraint: **a BIM manager
+must be able to write one in plain markdown in under 20 minutes.** No
+schema, no YAML, no JSON. The agent interprets intent, including semantic
+equivalence ("4 HR" means "4 hours"); the firm only states the rules.
 
 ## Location
 
@@ -15,19 +15,21 @@ Project-relative, read by every task that declares them as inputs:
 /standards/compliance.md    required values (fire ratings, code requirements)
 ```
 
-Both files are optional. If a naming file is absent, nomenclature-class tasks
-infer the dominant convention from the model and say so explicitly. If a
-compliance file is absent, the compliance task runs only its built-in
-consistency checks (conflicting values), not requirement checks.
+Starter versions of both live in the repo's `standards/` folder — firms
+adjust them rather than authoring from scratch.
+
+Both optional. Without a naming file, nomenclature-class tasks infer the
+dominant convention and say so explicitly. Without a compliance file, the
+compliance task runs only its built-in consistency checks.
 
 ## Authoring rules
 
-- Plain statements and small tables. Prose is fine — the agent reads intent.
-- One rule per line or table row, so rejections can map back to a specific rule.
-- List known abbreviations and accepted equivalents rather than trusting the
-  agent to guess firm-specific shorthand.
-- Anything intentionally non-conforming belongs in the Exceptions log
-  (exceptions-log.md), not as a carve-out sentence buried here.
+- Plain statements and small tables; prose is fine — the agent reads intent.
+- One rule per line or table row, so rejections map back to a specific rule.
+- List known abbreviations and accepted equivalents rather than trusting
+  the agent to guess firm-specific shorthand.
+- Intentional non-conformances belong in the Exceptions log
+  (exceptions-log.md), not as carve-out sentences buried here.
 
 ## Template: /standards/naming.md
 
@@ -74,18 +76,18 @@ Rules are checked, never auto-fixed. Findings appear in the daily report.
 
 ## Notes
 - "Rated wall" means any wall whose Fire Rating parameter is non-empty.
-- Values written in minutes and hours are the same rating; the fleet normalizes
-  when comparing but reports the written form.
+- Minutes and hours are the same rating; the fleet normalizes when
+  comparing but reports the written form.
 ```
 
 ## How tasks consume these files
 
-1. A standards file, when present, **is** the convention — tasks never override
-   it with an inferred pattern.
-2. Every CR rationale that rests on a rule cites it ("per naming.md: Rooms are
+1. A standards file, when present, **is** the convention — never overridden
+   by an inferred pattern.
+2. Every CR rationale resting on a rule cites it ("per naming.md: Rooms are
    Title Case").
-3. If a rule is ambiguous or two rules conflict, the task reports the ambiguity
-   in the daily report and does not enforce either reading.
-4. Repeated rejections against one rule (3+ sharing a pattern) surface in the
-   daily report as a suggested edit to the standards file — the firm updates the
-   file; the fleet never silently rewrites it.
+3. Ambiguous or conflicting rules: the task reports the ambiguity in the
+   daily report and enforces neither reading.
+4. 3+ rejections sharing a pattern against one rule surface in the daily
+   report as a suggested edit — the firm updates the file; the fleet never
+   silently rewrites it.
