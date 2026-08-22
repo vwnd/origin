@@ -142,3 +142,6 @@ dist
 .wrangler
 .dev.vars
 
+
+# Claude Code local worktrees
+.claude/worktrees/
