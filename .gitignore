@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.wrangler/
+
+# Environment
+.env
+.env.local
+.dev.vars
+
+# Claude Code local state.
+#
+# Skills under .claude/skills and .agents/skills are vendored from upstream
+# repos, so they are treated like node_modules: ignored here and restored from
+# skills-lock.json, which stays tracked. Shared settings in .claude are still
+# committable — only the local overrides and worktrees are ignored.
+.claude/worktrees/
+.claude/settings.local.json
+.claude/skills/
+.agents/skills/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
