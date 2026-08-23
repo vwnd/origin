@@ -9,6 +9,13 @@ import type { IndexedObject } from "./properties";
  * run finishes. Storage is 10 GB per object — properties-only indexing of a
  * large model is nowhere near that.
  *
+ * Disposable also means mortal: every instance carries a self-destruct
+ * schedule from its first wake, re-armed to `INDEX_TTL_SECONDS` past the end
+ * of each run, so an index cannot outlive its usefulness and keep billing
+ * storage. The reaper cron backstops the cases where no timer ever fires —
+ * objects created before the TTL existed, or runs whose isolate died before
+ * `finishRun` — see `purgeExpiredIndexes` in `api/reaper.ts`.
+ *
  * Holds **no geometry**. See `properties.ts` for how that is enforced.
  */
 
@@ -69,6 +76,20 @@ const FRONTIER_PENDING = 0;
 const FRONTIER_CLAIMED = 1;
 const FRONTIER_DONE = 2;
 
+/**
+ * How long a version's index outlives its run before the object destroys
+ * itself.
+ *
+ * The index is only a working set: findings and deltas land in Speckle, run
+ * facts land in D1, so nothing here is needed once the run is over — but a
+ * SQLite-backed Durable Object bills for stored data until `deleteAll()`
+ * empties it. A day leaves room to poke at a fresh run through the debug
+ * routes; after that the storage is pure cost. Well past the 6h hard
+ * deadline in `api/reaper.ts`, so an expiry armed at index time can never
+ * fire under a legitimately live run.
+ */
+export const INDEX_TTL_SECONDS = 24 * 60 * 60;
+
 export class InspectionAgent extends Agent<Env> {
   /**
    * Bulk inserts go through `ctx.storage.sql` with multi-row VALUES rather than
@@ -80,6 +101,39 @@ export class InspectionAgent extends Agent<Env> {
   }
 
   private schemaChecked = false;
+
+  /**
+   * Birth timer: no InspectionAgent may hold storage without a pending
+   * expiry. `idempotent` dedupes on callback + payload, so repeated wakes
+   * reuse the existing schedule rather than pushing the deadline out — a
+   * stream of debug reads cannot keep a dead index alive.
+   */
+  async onStart(): Promise<void> {
+    await this.schedule(INDEX_TTL_SECONDS, "expire", undefined, {
+      idempotent: true
+    });
+  }
+
+  /**
+   * Self-destruct, fired by the schedule armed in `onStart`/`finishRun` and
+   * called directly by the reaper's purge sweep. `destroy()` drops every
+   * table, clears the alarm, and empties storage — an object with empty
+   * storage and no alarm ceases to exist and is no longer billed. It also
+   * aborts the isolate, so RPC callers treat it as fire-and-forget.
+   */
+  async expire(): Promise<void> {
+    await this.destroy();
+  }
+
+  /** Replace any pending expiry with one `INDEX_TTL_SECONDS` from now. */
+  private async armExpiry(): Promise<void> {
+    for (const pending of await this.listSchedules()) {
+      if (pending.callback === "expire") {
+        await this.cancelSchedule(pending.id);
+      }
+    }
+    await this.schedule(INDEX_TTL_SECONDS, "expire");
+  }
 
   private ensureTables(): void {
     if (this.schemaChecked) return;
@@ -318,6 +372,10 @@ export class InspectionAgent extends Agent<Env> {
       stats.objects,
       stats.properties
     );
+    // Called at "indexed" and again on failure — the last call wins, so the
+    // clock always runs from the run's true end. The TTL dwarfs the time the
+    // scout fleet spends reading the index after "indexed".
+    await this.armExpiry();
   }
 
   async stats(): Promise<IndexStats> {

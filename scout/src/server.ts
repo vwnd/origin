@@ -5,7 +5,7 @@ import {
 } from "./speckle/webhook";
 import { handleDebug, isDebugRequest } from "./inspection/debug";
 import { handleApi, isApiRequest } from "./api/routes";
-import { reapStuckRuns } from "./api/reaper";
+import { purgeExpiredIndexes, reapStuckRuns } from "./api/reaper";
 
 export { InspectionAgent } from "./inspection/agent";
 export { EventsAgent } from "./api/events";
@@ -37,7 +37,11 @@ export default {
 
   // Reconcile run history against the Workflows engine, so a killed isolate
   // (exceededCpu has no catchable error) cannot leave a run "running" forever.
+  // Then destroy the index storage of versions whose runs are long over —
+  // expired agents usually remove themselves, this covers the ones that
+  // could not (pre-TTL objects, isolates killed before the timer was armed).
   async scheduled(_controller, env) {
     await reapStuckRuns(env);
+    await purgeExpiredIndexes(env);
   }
 } satisfies ExportedHandler<Env>;
