@@ -655,6 +655,19 @@ function ClosePlate() {
   );
 }
 
+/** The recording, filling the plate: the pitch that survives a dead demo. */
+function RecordingPlate() {
+  return (
+    <iframe
+      className="idea-art idea-recording"
+      src="https://www.tella.tv/video/vid_cmt5w752100hb0ajaaz4t3klk/embed?b=0&title=0&a=1&loop=0&t=0&muted=0&wt=0&o=1"
+      title="Origo — recorded presentation"
+      allow="autoplay; fullscreen"
+      allowTransparency
+    />
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Plates ported from the pitch deck.                                  */
 /*                                                                     */
@@ -1902,6 +1915,12 @@ const SLIDES: Slide[] = [
     statement: "“Just export a schedule and paste it into an LLM.”",
     layout: "full",
     render: ObjectionStage
+  },
+  {
+    eyebrow: "Backup — the recording",
+    statement: "The pitch, on tape.",
+    note: "A recording of this presentation, kept here in case the live run can't happen.",
+    plate: RecordingPlate
   }
 ];
 
