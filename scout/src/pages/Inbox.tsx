@@ -235,7 +235,7 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
                         >
                           <ChevronRight
                             className={cn(
-                              "size-4 transition-transform",
+                              "size-4 transition-transform duration-[240ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
                               isOpen && "rotate-90"
                             )}
                           />
@@ -280,13 +280,36 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
                       </TableCell>
                     </TableRow>
 
-                    {isOpen ? (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={7} className="bg-muted/30 p-0">
-                          <FindingList findings={findings} />
-                        </TableCell>
-                      </TableRow>
-                    ) : null}
+                    {/*
+                     * Always mounted — a `tr`/`td` can't itself animate to
+                     * `height: auto`, so the grid child inside does the work:
+                     * its track collapses to 0fr/1fr and the cell follows.
+                     */}
+                    <TableRow
+                      className={cn(
+                        "hover:bg-transparent",
+                        // Collapsed rows are always mounted for the height
+                        // animation below, but shouldn't add a stray hairline
+                        // under every closed issue.
+                        !isOpen && "border-b-0"
+                      )}
+                    >
+                      <TableCell colSpan={7} className="bg-muted/30 p-0">
+                        <div
+                          className="grid transition-[grid-template-rows] duration-[240ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
+                          style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+                        >
+                          <div
+                            className={cn(
+                              "overflow-hidden transition-opacity duration-150 motion-reduce:transition-none",
+                              isOpen ? "opacity-100 delay-100" : "opacity-0"
+                            )}
+                          >
+                            <FindingList findings={findings} />
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   </Fragment>
                 );
               })}
