@@ -827,6 +827,33 @@ body,
   }
 }
 
+/* Architecture plate: data cubes travelling the pipes. Linear on purpose —
+   a conveyor of data, not a gesture. Each cube fades in as it departs and
+   out as it arrives, so the loop restart never pops. */
+.idea-flow {
+  offset-path: var(--path);
+  offset-rotate: 0deg;
+  opacity: 0;
+  animation: idea-flow var(--t, 2000ms) linear var(--d, 0ms) infinite;
+}
+
+@keyframes idea-flow {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
 /* Warnings plate: an endless, ownerless scroll. */
 .idea-warnings {
   position: absolute;
@@ -953,6 +980,13 @@ body,
   .idea-warn-scroll,
   .idea-pulse {
     animation: none;
+  }
+
+  /* Hold each cube mid-pipe: the still frame keeps the flow legible. */
+  .idea-flow {
+    animation: none;
+    offset-distance: 55%;
+    opacity: 1;
   }
 
   .idea-arrow,

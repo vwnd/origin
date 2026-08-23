@@ -363,57 +363,221 @@ function TrustPlate() {
   );
 }
 
-/** A standards document writing itself, one rejection at a time. */
-function CompoundPlate() {
-  const lines = [130, 96, 118, 84, 110, 122, 90, 104, 116, 78];
+/**
+ * The architecture, with the data actually moving through it: the model
+ * publishes into Speckle, Origo wakes and fans a fleet of scouts over the
+ * version, findings come back as issues, and only what the designer approves
+ * travels back into the model.
+ *
+ * The pipes are drawn once on entrance; the cubes then run on `offset-path`
+ * loops — linear on purpose, a conveyor of data rather than a gesture.
+ */
+function ArchitecturePlate() {
+  // One pipe per leg of the journey, in reading order.
+  const pipes = [
+    "M92 128 L140 74", // model -> speckle
+    "M181 62 L252 62", // speckle -> origo
+    "M289 66 L343 116", // origo fans out to the fleet…
+    "M291 70 L343 147",
+    "M287 74 L341 176",
+    "M346 124 L293 226", // …and the scouts converge on the issues
+    "M349 154 L294 231",
+    "M347 182 L295 235",
+    "M251 238 L177 238", // issues -> review
+    "M151 230 L95 158" // approved fixes -> back into the model
+  ];
+
+  // [pipe, travel ms, first-departure ms] — the trunk legs carry two cubes in
+  // counter-phase so the pipeline never looks empty.
+  const cubes: Array<[string, number, number]> = [
+    [pipes[0], 2200, 1500],
+    [pipes[0], 2200, 2600],
+    [pipes[1], 2000, 1800],
+    [pipes[1], 2000, 2800],
+    [pipes[2], 1600, 2100],
+    [pipes[3], 1650, 2400],
+    [pipes[4], 1700, 2700],
+    [pipes[5], 1800, 2500],
+    [pipes[6], 1700, 3000],
+    [pipes[7], 1650, 3400],
+    [pipes[8], 1900, 2200],
+    [pipes[9], 2100, 2700]
+  ];
+
+  const label = (x: number, y: number, text: string, at: number) => (
+    <text
+      x={x}
+      y={y}
+      textAnchor="middle"
+      className="idea-mono idea-rise"
+      style={delay(at)}
+      fill={PAPER}
+    >
+      {text}
+    </text>
+  );
 
   return (
     <svg viewBox="0 0 400 300" className="idea-art" aria-hidden>
-      <rect
-        x={110}
-        y={28}
-        width={180}
-        height={244}
-        fill="none"
-        stroke={PAPER}
-        strokeWidth={1.5}
-        className="idea-rise"
-        style={delay(200)}
-      />
-      <line
-        x1={132}
-        y1={56}
-        x2={236}
-        y2={56}
-        stroke={PAPER}
-        strokeWidth={3}
-        className="idea-write"
-        style={delay(500)}
-      />
-      {lines.map((width, i) => (
-        <line
-          key={i}
-          x1={132}
-          y1={82 + i * 17}
-          x2={132 + width}
-          y2={82 + i * 17}
-          stroke={PAPER_DIM}
-          strokeWidth={2}
-          className="idea-write"
-          style={delay(700 + i * 130)}
-        />
-      ))}
-      <g className="idea-pop" style={delay(2100)}>
-        <circle
-          cx={262}
-          cy={250}
-          r={9}
+      {/* model — the designer's machine */}
+      <g className="idea-rise" style={delay(200)}>
+        <rect
+          x={40}
+          y={118}
+          width={48}
+          height={34}
           fill="none"
           stroke={PAPER}
           strokeWidth={1.5}
         />
-        <circle cx={262} cy={250} r={2.5} fill={PAPER} />
+        <line
+          x1={64}
+          y1={152}
+          x2={64}
+          y2={160}
+          stroke={PAPER}
+          strokeWidth={1.5}
+        />
+        <line
+          x1={54}
+          y1={160}
+          x2={74}
+          y2={160}
+          stroke={PAPER}
+          strokeWidth={1.5}
+        />
       </g>
+      {label(64, 182, "model", 260)}
+
+      {/* speckle — the data platform in between */}
+      <polygon
+        points="163,46 179,62 163,78 147,62"
+        fill="none"
+        stroke={PAPER}
+        strokeWidth={1.5}
+        className="idea-rise"
+        style={delay(360)}
+      />
+      {label(163, 98, "speckle", 420)}
+
+      {/* origo — the mark, pulsing: every publish is a wake-up call */}
+      <g className="idea-rise" style={delay(520)}>
+        <circle
+          cx={272}
+          cy={62}
+          r={16}
+          fill="none"
+          stroke={PAPER}
+          strokeWidth={1.5}
+        />
+        <circle cx={272} cy={62} r={4} fill={PAPER} />
+      </g>
+      <circle
+        cx={272}
+        cy={62}
+        r={16}
+        fill="none"
+        stroke={PAPER_DIM}
+        strokeWidth={1}
+        className="idea-pulse"
+      />
+      {label(272, 98, "origo", 580)}
+
+      {/* the fleet */}
+      {[112, 142, 172].map((y, i) => (
+        <rect
+          key={y}
+          x={346}
+          y={y}
+          width={12}
+          height={12}
+          fill="none"
+          stroke={PAPER}
+          strokeWidth={1.5}
+          className="idea-rise"
+          style={delay(680 + i * 90)}
+        />
+      ))}
+      {label(352, 208, "scouts", 860)}
+
+      {/* issues — findings with the fixes attached */}
+      <g className="idea-rise" style={delay(980)}>
+        <rect
+          x={254}
+          y={222}
+          width={36}
+          height={32}
+          fill="none"
+          stroke={PAPER}
+          strokeWidth={1.5}
+        />
+        {[230, 238, 246].map((y) => (
+          <line
+            key={y}
+            x1={260}
+            y1={y}
+            x2={284}
+            y2={y}
+            stroke={PAPER_DIM}
+            strokeWidth={1.5}
+          />
+        ))}
+      </g>
+      {label(272, 276, "issues", 1040)}
+
+      {/* review — the only write path */}
+      <g className="idea-rise" style={delay(1100)}>
+        <rect
+          x={155}
+          y={230}
+          width={16}
+          height={16}
+          fill="none"
+          stroke={PAPER}
+          strokeWidth={1.5}
+        />
+        <polyline
+          points="158.5,238 161.5,241.5 167.5,233.5"
+          fill="none"
+          stroke={PAPER}
+          strokeWidth={1.5}
+        />
+      </g>
+      {label(163, 276, "review", 1160)}
+
+      {/* the pipes, drawn in journey order */}
+      {pipes.map((d, i) => (
+        <path
+          key={d}
+          d={d}
+          fill="none"
+          stroke={PAPER_DIM}
+          strokeWidth={1.5}
+          pathLength={1}
+          className="idea-draw"
+          style={delay(400 + i * 110)}
+        />
+      ))}
+
+      {/* the data itself */}
+      {cubes.map(([d, travel, departure], i) => (
+        <rect
+          key={i}
+          x={-2.75}
+          y={-2.75}
+          width={5.5}
+          height={5.5}
+          fill={PAPER}
+          className="idea-flow"
+          style={
+            {
+              "--path": `path("${d}")`,
+              "--t": `${travel}ms`,
+              "--d": `${departure}ms`
+            } as CSSProperties
+          }
+        />
+      ))}
     </svg>
   );
 }
@@ -514,10 +678,10 @@ const SLIDES: Slide[] = [
     plate: TrustPlate
   },
   {
-    eyebrow: "06 — The compounding part",
-    statement: "Using it writes your standards down.",
-    note: "Every rejection becomes a durable exception; three of a kind revise the convention itself. The fleet gets better at your firm, not at models in general.",
-    plate: CompoundPlate
+    eyebrow: "06 — The architecture",
+    statement: "Publish the model. The fleet does the rest.",
+    note: "A publish lands in Speckle and wakes Origo. Scouts fan out over the version, file what they find as issues with the fixes pre-drafted, and you review them in Origo. Only what you approve flows back — the next publish comes back fixed.",
+    plate: ArchitecturePlate
   },
   {
     eyebrow: "Origo",
