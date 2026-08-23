@@ -804,12 +804,12 @@ body,
   }
 }
 
-/* The closing mark breathes once it has drawn. */
+/* The closing mark breathes once it has drawn; `--d` staggers a pair. */
 .idea-pulse {
   transform-box: fill-box;
   transform-origin: center;
   opacity: 0;
-  animation: idea-pulse 4s var(--ease) 1800ms infinite;
+  animation: idea-pulse 4s var(--ease) var(--d, 1800ms) infinite;
 }
 
 @keyframes idea-pulse {

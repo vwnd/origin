@@ -14,9 +14,9 @@ import { TextAnimate } from "@/components/ui/text-animate";
 /**
  * The pitch.
  *
- * The team, then eight plates from the product overview, cut down to what a
- * stranger can hold: models rot, warnings don't fix anything, the loop
- * closes, you approve eight fixes over coffee.
+ * The team, then seven plates from the product overview, cut down to what a
+ * stranger can hold: models rot, warnings don't fix anything, you approve
+ * eight fixes over coffee, and the loop that does it is the product.
  * Same sheet as the landing page — paper, ink, one blue — with one drawing
  * per slide doing the work a paragraph would otherwise do.
  */
@@ -187,49 +187,6 @@ function WarningsPlate() {
         {count.toLocaleString()} warnings · 0 owners
       </p>
     </div>
-  );
-}
-
-/** The loop, with a fix actually travelling around it. */
-function LoopPlate() {
-  const stations: Array<[string, number, number]> = [
-    ["detect", 200, 34],
-    ["judge", 337, 122],
-    ["draft", 288, 268],
-    ["deliver", 112, 268],
-    ["approve", 63, 122]
-  ];
-
-  return (
-    <svg viewBox="0 0 400 300" className="idea-art" aria-hidden>
-      <circle
-        cx={200}
-        cy={150}
-        r={95}
-        fill="none"
-        stroke={PAPER_DIM}
-        strokeWidth={1.5}
-        strokeDasharray="1 7"
-        strokeLinecap="round"
-      />
-      {stations.map(([label, x, y], i) => (
-        <text
-          key={label}
-          x={x}
-          y={y}
-          textAnchor="middle"
-          className="idea-mono idea-rise"
-          style={delay(300 + i * 130)}
-          fill={PAPER}
-        >
-          {label}
-        </text>
-      ))}
-      <g className="idea-orbit">
-        <circle cx={200} cy={55} r={5.5} fill={PAPER} />
-      </g>
-      <circle cx={200} cy={150} r={4} fill={PAPER_DIM} />
-    </svg>
   );
 }
 
@@ -742,6 +699,12 @@ function SystemPlate() {
               );
             })
           )}
+          {/* The loop, alive: a fix in transit, orbiting clockwise under the
+              stations. Inherited from the retired "Why now" plate — the same
+              dot, now travelling the system that carries it. */}
+          <g className="idea-orbit">
+            <circle cx={0} cy={-SYSTEM_R} r={4.5} fill="var(--blue)" />
+          </g>
           {SYSTEM_STATIONS.map((station, i) => {
             const at = point(station.angle, SYSTEM_R);
             return (
@@ -760,6 +723,19 @@ function SystemPlate() {
                     fill="var(--paper)"
                     stroke="rgba(22, 24, 28, 0.35)"
                     strokeWidth={2}
+                  />
+                )}
+                {/* Designed stations breathe: not built yet, but coming. */}
+                {!station.built && (
+                  <circle
+                    cx={at.x}
+                    cy={at.y}
+                    r={9}
+                    fill="none"
+                    stroke="rgba(22, 24, 28, 0.3)"
+                    strokeWidth={1}
+                    className="idea-pulse"
+                    style={delay(1800 + i * 900)}
                   />
                 )}
               </g>
@@ -882,31 +858,25 @@ const SLIDES: Slide[] = [
     plate: WarningsPlate
   },
   {
-    eyebrow: "03 — Why now",
-    statement: "The loop finally closes.",
-    note: "Agents make the call. Speckle delivers the fix into Revit as a change request you accept with a click. Rejections flow back and teach the fleet.",
-    plate: LoopPlate
-  },
-  {
-    eyebrow: "04 — What you get",
+    eyebrow: "03 — What you get",
     statement: "Eight fixes on your desk every morning.",
     note: "Each one names the element, the current value, the proposed value and a one-line why. Approve most, send a few back with a reason. About five minutes.",
     plate: MorningPlate
   },
   {
-    eyebrow: "05 — Trust",
+    eyebrow: "04 — Trust",
     statement: "Nothing touches the model but you.",
     note: "Human approval is the only write path, capped at ten proposals a day. The cap is a feature — a reviewer trained to bulk-approve would kill the product.",
     plate: TrustPlate
   },
   {
-    eyebrow: "06 — The architecture",
+    eyebrow: "05 — The architecture",
     statement: "Publish the model. The fleet does the rest.",
     note: "A publish lands in Speckle and wakes Origo. Scouts fan out over the version, file what they find as issues with the fixes pre-drafted, and you review them in Origo. Only what you approve flows back — the next publish comes back fixed.",
     plate: ArchitecturePlate
   },
   {
-    eyebrow: "07 — The system",
+    eyebrow: "06 — The system",
     statement: "The loop is the product.",
     note: "Five stations; three built, two designed — the honesty is the point.",
     plate: SystemPlate,
