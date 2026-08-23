@@ -360,16 +360,23 @@ export class InspectionAgent extends Agent<Env> {
       category?: string | null;
       minObjects?: number;
       limit?: number;
+      /** Exclude parameters holding numeric values — text vocabularies only. */
+      textOnly?: boolean;
     } = {}
   ): Promise<KeySummary[]> {
     this.ensureTables();
     const minObjects = options.minObjects ?? 2;
     const limit = Math.min(options.limit ?? 300, 1000);
+    const textGuard = options.textOnly
+      ? " AND SUM(CASE WHEN p.value_num IS NOT NULL THEN 1 ELSE 0 END) = 0"
+      : "";
 
     if (options.category) {
       return this.db
         .exec<KeySummary>(
-          "SELECT p.key_path AS keyPath, p.name AS name, COUNT(DISTINCT p.object_id) AS objects, COUNT(DISTINCT p.value_text) AS distinctValues, MAX(p.units) AS units FROM properties p JOIN objects o ON o.id = p.object_id WHERE o.category = ? GROUP BY p.key_path, p.name HAVING objects >= ? ORDER BY objects DESC, distinctValues ASC LIMIT ?;",
+          "SELECT p.key_path AS keyPath, p.name AS name, COUNT(DISTINCT p.object_id) AS objects, COUNT(DISTINCT p.value_text) AS distinctValues, MAX(p.units) AS units FROM properties p JOIN objects o ON o.id = p.object_id WHERE o.category = ? GROUP BY p.key_path, p.name HAVING objects >= ?" +
+            textGuard +
+            " ORDER BY objects DESC, distinctValues ASC LIMIT ?;",
           options.category,
           minObjects,
           limit
@@ -379,7 +386,9 @@ export class InspectionAgent extends Agent<Env> {
 
     return this.db
       .exec<KeySummary>(
-        "SELECT key_path AS keyPath, name AS name, COUNT(DISTINCT object_id) AS objects, COUNT(DISTINCT value_text) AS distinctValues, MAX(units) AS units FROM properties GROUP BY key_path, name HAVING objects >= ? ORDER BY objects DESC, distinctValues ASC LIMIT ?;",
+        "SELECT p.key_path AS keyPath, p.name AS name, COUNT(DISTINCT p.object_id) AS objects, COUNT(DISTINCT p.value_text) AS distinctValues, MAX(p.units) AS units FROM properties p GROUP BY p.key_path, p.name HAVING objects >= ?" +
+          textGuard +
+          " ORDER BY objects DESC, distinctValues ASC LIMIT ?;",
         minObjects,
         limit
       )
@@ -580,6 +589,9 @@ export class InspectionAgent extends Agent<Env> {
   async objectsWithValue(options: {
     keyPath: string;
     value: string;
+    /** Restrict to one object category — a category-scoped finding must not
+     *  produce edits on other categories that share the same value. */
+    category?: string | null;
     limit?: number;
   }): Promise<
     {
@@ -592,6 +604,10 @@ export class InspectionAgent extends Agent<Env> {
   > {
     this.ensureTables();
     const limit = Math.min(options.limit ?? 500, 2000);
+    const categoryGuard = options.category ? " AND o.category = ?" : "";
+    const bindings: (string | number)[] = [options.keyPath, options.value];
+    if (options.category) bindings.push(options.category);
+    bindings.push(limit);
     return this.db
       .exec<{
         objectId: string;
@@ -605,12 +621,11 @@ export class InspectionAgent extends Agent<Env> {
           " o.name AS name, o.category AS category" +
           " FROM properties p JOIN objects o ON o.id = p.object_id" +
           " WHERE p.key_path = ? AND p.value_text = ?" +
+          categoryGuard +
           " AND o.application_id IS NOT NULL" +
           " AND p.internal_definition_name <> ''" +
           " LIMIT ?;",
-        options.keyPath,
-        options.value,
-        limit
+        ...bindings
       )
       .toArray();
   }

@@ -61,9 +61,12 @@ export async function buildDeltas(options: {
         break;
       }
 
+      // A category-scoped finding edits only that category — other objects
+      // sharing the same value were never judged and must not be touched.
       const objects = await agent.objectsWithValue({
         keyPath: finding.keyPath,
         value: evidence.value,
+        category: finding.category,
         limit: MAX_DELTAS_PER_ISSUE - deltas.length
       });
 

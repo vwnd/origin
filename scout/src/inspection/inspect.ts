@@ -13,10 +13,12 @@ import { createLogger, errorMessage, type Logger } from "../speckle/logging";
  * history every turn and tool results are large, so input tokens grow
  * quadratically with turn count.
  *
- * The fix is to stop paying a model to do work SQL does for free. Candidate
- * selection is now a deterministic query (`agent.listCandidateParameters`), and
- * the model only makes the judgement it is actually needed for: "is this one
- * histogram internally inconsistent?"
+ * The fix is to stop paying a model to do work SQL does for free. The scout
+ * first decides its own scope from its brief — two small calls: which object
+ * categories the brief concerns, then which parameters within them — and SQL
+ * supplies the inventory and histograms. The model then only makes the
+ * judgement it is actually needed for: "is this one histogram internally
+ * inconsistent?" A room-naming scout never sees wall parameters at all.
  *
  * That turns one long conversation into many small stateless requests. There is
  * no history to re-read, the shared prefix is byte-identical across every
@@ -73,7 +75,7 @@ export type Usage = {
 export type InspectionResult = {
   instructionId: string;
   findings: Finding[];
-  /** Parameters the SQL filter selected. */
+  /** Parameters the scout scoped itself to. */
   candidates: number;
   /** Parameters actually sent to the model. */
   judged: number;
@@ -96,6 +98,73 @@ function isFatal(error: unknown): boolean {
     typeof error.status === "number" &&
     [400, 401, 403, 404].includes(error.status)
   );
+}
+
+/** Runaway guard on parameters judged after scoping. */
+const MAX_TARGETS = 60;
+
+/**
+ * Scoping: before anything is judged, the scout reads its own brief and
+ * decides what data it needs — first which object categories the brief
+ * concerns, then which parameters within them. This is what stops a
+ * room-naming scout from filing findings about wall types: those parameters
+ * are simply never shown to the judge.
+ */
+const SCOPE_SYSTEM = `You are Scout, a quality reviewer for building models published to Speckle.
+
+Below is your inspection brief. Before any judging happens you must decide
+WHAT data the brief actually concerns — the narrowest scope that covers it.
+A brief about room naming must not inspect wall types; a brief about fire
+ratings has no business in door hardware. Choose "all" only when the brief
+genuinely applies to every kind of object.`;
+
+const SCOPE_TOOL: Anthropic.Tool = {
+  name: "select_categories",
+  description: "Declare which object categories your brief concerns.",
+  input_schema: {
+    type: "object",
+    properties: {
+      scope: {
+        type: "string",
+        enum: ["all", "selected"],
+        description:
+          "'selected' with a categories list when the brief targets specific kinds of objects; 'all' only when it genuinely applies to every category."
+      },
+      categories: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Category names copied verbatim from the list shown. Required when scope is 'selected'."
+      }
+    },
+    required: ["scope"],
+    additionalProperties: false
+  }
+};
+
+const TARGET_TOOL: Anthropic.Tool = {
+  name: "select_parameters",
+  description: "Select the parameters your brief should inspect.",
+  input_schema: {
+    type: "object",
+    properties: {
+      keyPaths: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "keyPath strings copied verbatim from the list shown. Empty when none are relevant to the brief."
+      }
+    },
+    required: ["keyPaths"],
+    additionalProperties: false
+  }
+};
+
+function toolInputOf(response: Anthropic.Message): Record<string, unknown> {
+  const block = response.content.find(
+    (item): item is Anthropic.ToolUseBlock => item.type === "tool_use"
+  );
+  return (block?.input as Record<string, unknown>) ?? {};
 }
 
 const SYSTEM_PREAMBLE = `You are Scout, a quality reviewer for building models published to Speckle.
@@ -228,29 +297,18 @@ export async function runInstruction(options: {
 
   const client = new Anthropic({ apiKey });
 
-  // Free: no model involved in deciding what is worth looking at.
-  const allCandidates = await agent.listCandidateParameters();
-  const candidates = options.maxCandidates
-    ? allCandidates.slice(0, options.maxCandidates)
-    : allCandidates;
-  const histograms = await agent.histogramsFor(
-    candidates.map((candidate) => candidate.keyPath)
-  );
-
-  logger.info("candidates_selected", {
-    candidates: allCandidates.length,
-    judging: candidates.length,
-    histogramKeys: Object.keys(histograms).length,
-    sampleKey: candidates[0]?.keyPath,
-    sampleValues: (histograms[candidates[0]?.keyPath ?? ""] ?? []).length
-  });
-
   const findings: Finding[] = [];
   const usage = {
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheWriteTokens: 0
+  };
+  const takeUsage = (response: Anthropic.Message) => {
+    usage.inputTokens += response.usage.input_tokens;
+    usage.outputTokens += response.usage.output_tokens;
+    usage.cacheReadTokens += response.usage.cache_read_input_tokens ?? 0;
+    usage.cacheWriteTokens += response.usage.cache_creation_input_tokens ?? 0;
   };
   let judged = 0;
   let failed = 0;
@@ -260,8 +318,181 @@ export async function runInstruction(options: {
   // "cost_cap" comparison below is (wrongly) flagged as impossible.
   let stoppedBecause = "completed" as InspectionResult["stoppedBecause"];
 
-  // Byte-identical for every request, so it becomes the cached prefix and is
-  // read at a fraction of its cost after the first call.
+  /** An honest early exit: the scout looked, and its brief scopes to nothing
+   *  in this model — which is a clean outcome, not a failure. */
+  const nothingInScope = (): InspectionResult => ({
+    instructionId: instruction.id,
+    findings: [],
+    candidates: 0,
+    judged: 0,
+    failed: 0,
+    stoppedBecause: "completed",
+    error: null,
+    usage: { ...usage, estimatedCostUsd: estimateCost(usage) }
+  });
+
+  // Shared by both scoping calls, so the second reads the first's cache.
+  const scopeSystem: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: `${SCOPE_SYSTEM}\n\n---\n\n${instruction.body}`,
+      cache_control: { type: "ephemeral" }
+    }
+  ];
+
+  // ---- Scope stage 1: which categories does the brief concern? ----------
+  const types = await agent.listObjectTypes();
+  const categoryCounts = new Map<string, number>();
+  for (const type of types) {
+    if (!type.category) continue;
+    categoryCounts.set(
+      type.category,
+      (categoryCounts.get(type.category) ?? 0) + type.count
+    );
+  }
+
+  const scopeResponse = await client.messages.create({
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    system: scopeSystem,
+    tools: [SCOPE_TOOL],
+    tool_choice: { type: "tool", name: "select_categories" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          `Model: ${options.modelName ?? "unknown"}`,
+          "",
+          "Object categories in this model (objects x category):",
+          ...[...categoryCounts.entries()].map(
+            ([category, count]) => `${count} x ${JSON.stringify(category)}`
+          )
+        ].join("\n")
+      }
+    ]
+  });
+  takeUsage(scopeResponse);
+
+  const scopeInput = toolInputOf(scopeResponse) as {
+    scope?: string;
+    categories?: unknown[];
+  };
+  const scopedCategories =
+    scopeInput.scope === "selected"
+      ? [
+          ...new Set(
+            (scopeInput.categories ?? [])
+              .filter((item): item is string => typeof item === "string")
+              .filter((item) => categoryCounts.has(item))
+          )
+        ]
+      : [];
+
+  if (scopeInput.scope === "selected" && scopedCategories.length === 0) {
+    logger.info("scope_no_categories", {
+      requested: scopeInput.categories ?? []
+    });
+    return nothingInScope();
+  }
+
+  // ---- Scope stage 2: which parameters within that scope? ---------------
+  // Category-scoped scouts pick from everything their categories carry —
+  // including high-cardinality parameters like room names, which the global
+  // enum-like heuristic deliberately excludes. Global scouts keep the
+  // heuristic; it exists to keep "judge everything" affordable.
+  type Target = {
+    keyPath: string;
+    category: string | null;
+    objects: number;
+    distinctValues: number;
+    definition: string;
+  };
+
+  let inventory: Target[] = [];
+  if (scopedCategories.length > 0) {
+    for (const category of scopedCategories) {
+      const keys = await agent.listPropertyKeys({
+        category,
+        minObjects: 2,
+        limit: 120,
+        textOnly: true
+      });
+      for (const key of keys) {
+        if (key.distinctValues < 2 || key.distinctValues > 2000) continue;
+        inventory.push({
+          keyPath: key.keyPath,
+          category,
+          objects: key.objects,
+          distinctValues: key.distinctValues,
+          definition: key.name
+        });
+      }
+    }
+  } else {
+    inventory = (await agent.listCandidateParameters()).map((candidate) => ({
+      keyPath: candidate.keyPath,
+      category: null,
+      objects: candidate.objects,
+      distinctValues: candidate.distinctValues,
+      definition: candidate.internalDefinitionName
+    }));
+  }
+
+  if (inventory.length === 0) {
+    logger.info("scope_no_parameters", { categories: scopedCategories });
+    return nothingInScope();
+  }
+
+  const targetResponse = await client.messages.create({
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    system: scopeSystem,
+    tools: [TARGET_TOOL],
+    tool_choice: { type: "tool", name: "select_parameters" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          scopedCategories.length > 0
+            ? `Parameters carried by the categories in scope (${scopedCategories.join(", ")}):`
+            : "Candidate parameters across the whole model:",
+          "",
+          ...inventory.map(
+            (target) =>
+              `${target.keyPath}${target.category ? `  [${target.category}]` : ""}  — ${target.objects} objects, ${target.distinctValues} distinct values`
+          ),
+          "",
+          "Select only the parameters your brief actually concerns, by exact keyPath."
+        ].join("\n")
+      }
+    ]
+  });
+  takeUsage(targetResponse);
+
+  const targetInput = toolInputOf(targetResponse) as { keyPaths?: unknown[] };
+  const wanted = new Set(
+    (targetInput.keyPaths ?? []).filter(
+      (item): item is string => typeof item === "string"
+    )
+  );
+
+  let targets = inventory.filter((target) => wanted.has(target.keyPath));
+  if (options.maxCandidates) targets = targets.slice(0, options.maxCandidates);
+  targets = targets.slice(0, MAX_TARGETS);
+
+  logger.info("scope_selected", {
+    categories: scopedCategories,
+    offered: inventory.length,
+    selected: targets.length,
+    sample: targets.slice(0, 5).map((target) => target.keyPath)
+  });
+
+  if (targets.length === 0) {
+    return nothingInScope();
+  }
+
+  // Byte-identical for every judge request, so it becomes the cached prefix
+  // and is read at a fraction of its cost after the first call.
   const system: Anthropic.TextBlockParam[] = [
     {
       type: "text",
@@ -271,14 +502,14 @@ export async function runInstruction(options: {
   ];
 
   type WorkItem = {
-    candidate: (typeof candidates)[number];
+    target: Target;
     values: { value: string | null; count: number }[];
     part: number;
     parts: number;
   };
 
   const judgeOne = async (item: WorkItem) => {
-    const { candidate, values } = item;
+    const { target, values } = item;
 
     const response = await client.messages.create({
       model: MODEL,
@@ -291,9 +522,12 @@ export async function runInstruction(options: {
           role: "user",
           content: [
             `Model: ${options.modelName ?? "unknown"}`,
-            `Parameter: ${candidate.keyPath}`,
-            `Definition: ${candidate.internalDefinitionName}`,
-            `Carried by ${candidate.objects} objects, ${candidate.distinctValues} distinct values.`,
+            `Parameter: ${target.keyPath}`,
+            `Definition: ${target.definition}`,
+            target.category
+              ? `Category: ${target.category} (only values carried by this category are shown)`
+              : "",
+            `Carried by ${target.objects} objects, ${target.distinctValues} distinct values.`,
             item.parts > 1
               ? `Showing part ${item.part} of ${item.parts} of the value list; judge only the values below.`
               : "",
@@ -305,14 +539,11 @@ export async function runInstruction(options: {
       ]
     });
 
-    usage.inputTokens += response.usage.input_tokens;
-    usage.outputTokens += response.usage.output_tokens;
-    usage.cacheReadTokens += response.usage.cache_read_input_tokens ?? 0;
-    usage.cacheWriteTokens += response.usage.cache_creation_input_tokens ?? 0;
+    takeUsage(response);
     judged++;
 
     if (response.stop_reason === "refusal") {
-      logger.warn("judge_refused", { keyPath: candidate.keyPath });
+      logger.warn("judge_refused", { keyPath: target.keyPath });
       return;
     }
 
@@ -332,7 +563,7 @@ export async function runInstruction(options: {
     // file it. A wrong finding costs the reviewer more than a missed one.
     if (suspect.length === 0 || !judgement.summary) {
       logger.warn("judge_issue_without_evidence", {
-        keyPath: candidate.keyPath
+        keyPath: target.keyPath
       });
       return;
     }
@@ -340,8 +571,8 @@ export async function runInstruction(options: {
     findings.push({
       instructionId: instruction.id,
       severity: judgement.severity ?? "medium",
-      keyPath: candidate.keyPath,
-      category: null,
+      keyPath: target.keyPath,
+      category: target.category,
       summary: judgement.summary,
       evidence: suspect.map((item) => ({
         value: String(item.value),
@@ -359,15 +590,28 @@ export async function runInstruction(options: {
     });
   };
 
-  // Expand each candidate into one work item per chunk of its value list.
+  // Histograms: bulk for a global scout; per-category for a scoped one, so
+  // the judge only ever sees the values its own categories carry.
+  const bulkHistograms =
+    scopedCategories.length === 0
+      ? await agent.histogramsFor(targets.map((target) => target.keyPath))
+      : null;
+
+  // Expand each target into one work item per chunk of its value list.
   const queue: WorkItem[] = [];
-  for (const candidate of candidates) {
-    const values = histograms[candidate.keyPath] ?? [];
+  for (const target of targets) {
+    const values = bulkHistograms
+      ? (bulkHistograms[target.keyPath] ?? [])
+      : await agent.distinctValues({
+          keyPath: target.keyPath,
+          category: target.category,
+          limit: 400
+        });
     if (values.length < 2) continue;
     const parts = Math.ceil(values.length / VALUES_PER_REQUEST);
     for (let part = 0; part < parts; part++) {
       queue.push({
-        candidate,
+        target,
         values: values.slice(
           part * VALUES_PER_REQUEST,
           (part + 1) * VALUES_PER_REQUEST
@@ -379,7 +623,7 @@ export async function runInstruction(options: {
   }
 
   logger.info("work_planned", {
-    candidates: candidates.length,
+    targets: targets.length,
     requests: queue.length
   });
 
@@ -400,7 +644,7 @@ export async function runInstruction(options: {
         failed++;
         firstError ??= errorMessage(error);
         logger.warn("judge_failed", {
-          keyPath: item.candidate.keyPath,
+          keyPath: item.target.keyPath,
           error: errorMessage(error)
         });
         // Don't grind through the remaining parameters on a systemic failure.
@@ -431,7 +675,8 @@ export async function runInstruction(options: {
 
   logger.info("inspection_complete", {
     instruction: instruction.id,
-    candidates: candidates.length,
+    categories: scopedCategories,
+    targets: targets.length,
     judged,
     findings: findings.length,
     stoppedBecause,
@@ -444,7 +689,7 @@ export async function runInstruction(options: {
   return {
     instructionId: instruction.id,
     findings,
-    candidates: candidates.length,
+    candidates: targets.length,
     judged,
     failed,
     stoppedBecause,
