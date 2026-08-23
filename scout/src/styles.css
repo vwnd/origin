@@ -549,6 +549,11 @@ body,
   height: 100%;
 }
 
+/* The backup recording sits on the plate like any other drawing. */
+.idea-recording {
+  border: 0;
+}
+
 .idea-mono {
   font-family: var(--mono);
   font-size: 13px;
