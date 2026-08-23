@@ -14,9 +14,9 @@ import { TextAnimate } from "@/components/ui/text-animate";
 /**
  * The pitch.
  *
- * The team, then nine plates from the product overview, cut down to what a
- * stranger can hold: models rot, warnings don't fix anything, judgment just
- * became automatable, the loop closes, you approve eight fixes over coffee.
+ * The team, then eight plates from the product overview, cut down to what a
+ * stranger can hold: models rot, warnings don't fix anything, the loop
+ * closes, you approve eight fixes over coffee.
  * Same sheet as the landing page — paper, ink, one blue — with one drawing
  * per slide doing the work a paragraph would otherwise do.
  */
@@ -187,61 +187,6 @@ function WarningsPlate() {
         {count.toLocaleString()} warnings · 0 owners
       </p>
     </div>
-  );
-}
-
-/** Four spellings converge on the one rating they always were. */
-function JudgePlate() {
-  const variants = ["4 HR", "4hr", "240 min", "4 hours"];
-
-  return (
-    <svg viewBox="0 0 400 300" className="idea-art" aria-hidden>
-      {variants.map((label, i) => {
-        const y = 68 + i * 55;
-        return (
-          <g key={label}>
-            <text
-              x={56}
-              y={y + 4}
-              className="idea-mono idea-rise"
-              style={delay(300 + i * 140)}
-              fill={PAPER}
-            >
-              {label}
-            </text>
-            <line
-              x1={150}
-              y1={y}
-              x2={258}
-              y2={150}
-              stroke={PAPER_DIM}
-              strokeWidth={1.5}
-              pathLength={1}
-              className="idea-draw"
-              style={delay(700 + i * 140)}
-            />
-          </g>
-        );
-      })}
-      <circle
-        cx={296}
-        cy={150}
-        r={37}
-        fill={PAPER}
-        className="idea-pop"
-        style={delay(1500)}
-      />
-      <text
-        x={296}
-        y={155}
-        textAnchor="middle"
-        className="idea-mono idea-rise"
-        style={delay(1650)}
-        fill="#2323e6"
-      >
-        4 HR
-      </text>
-    </svg>
   );
 }
 
@@ -546,36 +491,30 @@ const SLIDES: Slide[] = [
   },
   {
     eyebrow: "02 — The gap",
-    statement: "Revit already warns. Nobody owns the list.",
+    statement: "Revit already warns. Nobody cares to fix.",
     note: "Hundreds of untriaged warnings per project, and every checker on the market stops exactly where the work begins. Knowing is solved. Doing is not.",
     plate: WarningsPlate
   },
   {
-    eyebrow: "03 — Why rules can't fix it",
-    statement: "Four strings. One fire rating.",
-    note: "Rule engines compare text, so “4 HR”, “4hr”, “240 min” and “4 hours” are four different values. Telling a convention from a violation takes judgment — and judgment just became automatable.",
-    plate: JudgePlate
-  },
-  {
-    eyebrow: "04 — Why now",
+    eyebrow: "03 — Why now",
     statement: "The loop finally closes.",
     note: "Agents make the call. Speckle delivers the fix into Revit as a change request you accept with a click. Rejections flow back and teach the fleet.",
     plate: LoopPlate
   },
   {
-    eyebrow: "05 — What you get",
+    eyebrow: "04 — What you get",
     statement: "Eight fixes on your desk every morning.",
     note: "Each one names the element, the current value, the proposed value and a one-line why. Approve most, send a few back with a reason. About five minutes.",
     plate: MorningPlate
   },
   {
-    eyebrow: "06 — Trust",
+    eyebrow: "05 — Trust",
     statement: "Nothing touches the model but you.",
     note: "Human approval is the only write path, capped at ten proposals a day. The cap is a feature — a reviewer trained to bulk-approve would kill the product.",
     plate: TrustPlate
   },
   {
-    eyebrow: "07 — The compounding part",
+    eyebrow: "06 — The compounding part",
     statement: "Using it writes your standards down.",
     note: "Every rejection becomes a durable exception; three of a kind revise the convention itself. The fleet gets better at your firm, not at models in general.",
     plate: CompoundPlate
