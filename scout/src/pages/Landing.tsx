@@ -153,10 +153,13 @@ export function Landing() {
 
           <Statement />
 
-          <div className="origo-in" style={delay(1320)}>
+          <div className="origo-actions origo-in" style={delay(1320)}>
             <Link to="/inbox" className="origo-cta">
               Open Inbox
               <ArrowRight className="size-4" />
+            </Link>
+            <Link to="/idea" className="origo-cta-quiet">
+              The idea, in ten slides
             </Link>
           </div>
         </div>

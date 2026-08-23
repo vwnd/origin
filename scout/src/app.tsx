@@ -14,6 +14,7 @@ import { Inbox } from "@/pages/Inbox";
 import { Scouts } from "@/pages/Scouts";
 import { Analytics } from "@/pages/Analytics";
 import { Landing } from "@/pages/Landing";
+import { Idea } from "@/pages/Idea";
 
 const NAV = [
   { to: "/inbox", label: "Inbox" },
@@ -153,6 +154,9 @@ export default function App() {
         {/* The landing page is deliberately outside the shell: no header, no
             event socket, nothing but the way in. */}
         <Route path="/" element={<Landing />} />
+        {/* The pitch deck lives outside the shell too: same sheet as the
+            landing page, nothing but the argument. */}
+        <Route path="/idea" element={<Idea />} />
         <Route path="*" element={<Shell />} />
       </Routes>
     </Router>
