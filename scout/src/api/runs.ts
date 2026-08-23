@@ -156,6 +156,44 @@ export async function listUnfinishedRunsStalledSince(
   }));
 }
 
+/**
+ * Versions whose InspectionAgent storage is due for destruction: every run of
+ * the version is finished, the newest activity predates `cutoff`, and at
+ * least one row has not been stamped purged. Grouped by version because the
+ * Durable Object is named by `version_id` — several webhook re-deliveries
+ * share one object, and it must outlive the newest of them, not the oldest.
+ */
+export async function listPurgeableVersions(
+  env: Env,
+  cutoff: Date,
+  limit = 25
+): Promise<string[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT version_id
+     FROM runs
+     GROUP BY version_id
+     HAVING SUM(CASE WHEN finished_at IS NULL THEN 1 ELSE 0 END) = 0
+        AND MAX(COALESCE(finished_at, started_at)) < ?
+        AND SUM(CASE WHEN do_purged_at IS NULL THEN 1 ELSE 0 END) > 0
+     LIMIT ?`
+  )
+    .bind(cutoff.toISOString(), limit)
+    .all();
+  return (results ?? []).map((row) => String(row.version_id));
+}
+
+/** Stamp every run of a version as having had its index storage destroyed. */
+export async function markVersionPurged(
+  env: Env,
+  versionId: string
+): Promise<void> {
+  await env.DB.prepare(
+    "UPDATE runs SET do_purged_at = ? WHERE version_id = ? AND do_purged_at IS NULL"
+  )
+    .bind(new Date().toISOString(), versionId)
+    .run();
+}
+
 export async function listRuns(env: Env, limit = 50): Promise<RunRecord[]> {
   const { results } = await env.DB.prepare(
     "SELECT * FROM runs ORDER BY started_at DESC LIMIT ?"

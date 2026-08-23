@@ -1,6 +1,14 @@
-import { createLogger } from "../speckle/logging";
+import { getAgentByName } from "agents";
+import { createLogger, errorMessage } from "../speckle/logging";
+import { INDEX_TTL_SECONDS } from "../inspection/agent";
+import type { InspectionAgent } from "../inspection/agent";
 import { publishEvent } from "./events";
-import { listUnfinishedRunsStalledSince, updateRun } from "./runs";
+import {
+  listPurgeableVersions,
+  listUnfinishedRunsStalledSince,
+  markVersionPurged,
+  updateRun
+} from "./runs";
 
 /**
  * Reconciles the D1 run history against the Workflows engine.
@@ -73,6 +81,57 @@ export async function reapStuckRuns(env: Env): Promise<{
 
   logger.info("reaper_swept", { swept: stale.length, reaped });
   return { swept: stale.length, reaped };
+}
+
+/**
+ * Grace past the agent's own TTL before the sweep steps in. When the
+ * self-destruct schedule works — the normal case — the object is already
+ * gone by the time its versions clear this cutoff, and the sweep's destroy
+ * call is a single throwaway wake that confirms it and stamps the rows.
+ */
+const PURGE_GRACE_MS = 60 * 60 * 1000;
+
+/**
+ * Destroy the InspectionAgent storage of versions whose runs are long over.
+ *
+ * The agents time out on their own (`expire` in `inspection/agent.ts`); this
+ * sweep is the backstop that makes leaked storage structurally impossible:
+ * objects from before the TTL existed, and runs whose isolate died before
+ * `finishRun` could arm the timer. Driven by the D1 run history and stamped
+ * back into it, so each version is woken for teardown exactly once —
+ * SQLite-backed objects bill for storage until it is destroyed, and a
+ * destroyed object must not be resurrected every sweep just to re-destroy it.
+ */
+export async function purgeExpiredIndexes(env: Env): Promise<{
+  purged: number;
+}> {
+  const logger = createLogger(crypto.randomUUID(), { source: "purge" });
+  const cutoff = new Date(
+    Date.now() - INDEX_TTL_SECONDS * 1000 - PURGE_GRACE_MS
+  );
+  const versions = await listPurgeableVersions(env, cutoff);
+  if (versions.length === 0) return { purged: 0 };
+
+  let purged = 0;
+  for (const versionId of versions) {
+    try {
+      const agent = await getAgentByName<Env, InspectionAgent>(
+        env.InspectionAgent,
+        versionId
+      );
+      // destroy() aborts the object's isolate, so the call may reject after
+      // the storage is already gone — that rejection is success here.
+      await agent.destroy().catch(() => {});
+      await markVersionPurged(env, versionId);
+      purged++;
+    } catch (error) {
+      // Left unstamped: the next sweep retries this version.
+      logger.warn("purge_failed", { versionId, error: errorMessage(error) });
+    }
+  }
+
+  logger.info("purge_swept", { candidates: versions.length, purged });
+  return { purged };
 }
 
 /** What a stale row should become, or null to leave it for the next sweep. */
