@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode
 } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { RuleField } from "@/components/rule-field";
 import { TextAnimate } from "@/components/ui/text-animate";
@@ -730,10 +730,25 @@ const EXIT = 220;
 
 export function Idea() {
   const reduced = usePrefersReducedMotion();
-  const [index, setIndex] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // `?slide=N` deep-links a slide, 1-based to match the on-screen counter.
+  const [index, setIndex] = useState(() => {
+    const slide = Number(searchParams.get("slide"));
+    return Number.isInteger(slide)
+      ? Math.max(0, Math.min(SLIDES.length - 1, slide - 1))
+      : 0;
+  });
   const [leaving, setLeaving] = useState(false);
   const target = useRef(0);
   const timer = useRef<number>(undefined);
+
+  // Keep the URL shareable as the deck advances. Replace, not push — the
+  // back button should leave the deck, not replay it slide by slide.
+  useEffect(() => {
+    setSearchParams(index === 0 ? {} : { slide: String(index + 1) }, {
+      replace: true
+    });
+  }, [index, setSearchParams]);
 
   useEffect(() => {
     document.documentElement.classList.add("origo-paper");
