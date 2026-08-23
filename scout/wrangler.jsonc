@@ -46,8 +46,13 @@
   "limits": {
     "cpu_ms": 300000
   },
-  // The long-running load lives in a Workflow: unlimited wall time per step,
-  // and durable retry if Speckle blips mid-stream.
+  // Reaper cron: resolves runs whose workflow died without a catchable error
+  // (exceededCpu kills the isolate outright) to a terminal state in D1.
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  // The long-running load lives in a Workflow: durable retry if Speckle blips
+  // mid-stream, with explicit per-step timeouts set in workflow.ts.
   "workflows": [
     {
       "name": "scout-inspection",

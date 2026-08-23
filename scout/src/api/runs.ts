@@ -87,6 +87,8 @@ export async function updateRun(
     issueIdentifier: string | null;
     error: string | null;
     finished: boolean;
+    /** Stamp `last_progress_at` — proof of life for the reaper. */
+    heartbeat: boolean;
   }>
 ): Promise<void> {
   await env.DB.prepare(
@@ -99,7 +101,8 @@ export async function updateRun(
        cost_usd = COALESCE(?, cost_usd),
        issue_identifier = COALESCE(?, issue_identifier),
        error = COALESCE(?, error),
-       finished_at = COALESCE(?, finished_at)
+       finished_at = COALESCE(?, finished_at),
+       last_progress_at = COALESCE(?, last_progress_at)
      WHERE instance_id = ?`
   )
     .bind(
@@ -112,9 +115,45 @@ export async function updateRun(
       patch.issueIdentifier ?? null,
       patch.error ?? null,
       patch.finished ? new Date().toISOString() : null,
+      patch.heartbeat ? new Date().toISOString() : null,
       instanceId
     )
     .run();
+}
+
+export type UnfinishedRun = {
+  instanceId: string;
+  projectId: string;
+  versionId: string;
+  startedAt: string;
+  lastProgressAt: string | null;
+};
+
+/**
+ * Runs with no terminal state whose last sign of life — heartbeat, or start
+ * time when none was ever written — predates `cutoff`. ISO-8601 strings
+ * compare correctly as text, so the filter happens in SQL.
+ */
+export async function listUnfinishedRunsStalledSince(
+  env: Env,
+  cutoff: Date
+): Promise<UnfinishedRun[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT instance_id, project_id, version_id, started_at, last_progress_at
+     FROM runs
+     WHERE finished_at IS NULL
+       AND COALESCE(last_progress_at, started_at) < ?`
+  )
+    .bind(cutoff.toISOString())
+    .all();
+  return (results ?? []).map((row) => ({
+    instanceId: String(row.instance_id),
+    projectId: String(row.project_id),
+    versionId: String(row.version_id),
+    startedAt: String(row.started_at),
+    lastProgressAt:
+      row.last_progress_at === null ? null : String(row.last_progress_at)
+  }));
 }
 
 export async function listRuns(env: Env, limit = 50): Promise<RunRecord[]> {

@@ -5,6 +5,7 @@ import {
 } from "./speckle/webhook";
 import { handleDebug, isDebugRequest } from "./inspection/debug";
 import { handleApi, isApiRequest } from "./api/routes";
+import { reapStuckRuns } from "./api/reaper";
 
 export { InspectionAgent } from "./inspection/agent";
 export { EventsAgent } from "./api/events";
@@ -32,5 +33,11 @@ export default {
       (await routeAgentRequest(request, env)) ||
       new Response("Not found", { status: 404 })
     );
+  },
+
+  // Reconcile run history against the Workflows engine, so a killed isolate
+  // (exceededCpu has no catchable error) cannot leave a run "running" forever.
+  async scheduled(_controller, env) {
+    await reapStuckRuns(env);
   }
 } satisfies ExportedHandler<Env>;

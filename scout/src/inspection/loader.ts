@@ -22,6 +22,13 @@ import type { IndexedObject } from "./properties";
 /** Objects per RPC to the agent. Large enough to amortise, small enough to stay cheap. */
 const BATCH_SIZE = 200;
 
+/**
+ * Abort the download when the stream goes quiet for this long. Without it a
+ * stalled connection holds the workflow step open until the step timeout —
+ * minutes of dead air that look identical to a slow load.
+ */
+const STALL_TIMEOUT_MS = 60_000;
+
 export type LoadResult = {
   /** Lines seen in the stream, geometry included. */
   totalLines: number;
@@ -52,102 +59,136 @@ export async function loadVersionIntoIndex(options: {
   const { token, projectId, rootObjectId, ingest } = options;
   const started = Date.now();
 
+  // Stall watchdog: re-armed on every chunk; firing aborts the fetch so the
+  // step fails fast with a diagnosable error instead of waiting out its
+  // timeout.
+  const stall = new AbortController();
+  let stalled = false;
+  let stallTimer: ReturnType<typeof setTimeout> | undefined;
+  const armStallTimer = () => {
+    if (stallTimer !== undefined) clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => {
+      stalled = true;
+      stall.abort();
+    }, STALL_TIMEOUT_MS);
+  };
+
+  armStallTimer();
   const response = await fetch(
     `${SPECKLE_SERVER_URL}/objects/${projectId}/${rootObjectId}`,
     {
       headers: {
         authorization: `Bearer ${token}`,
         accept: "text/plain"
-      }
+      },
+      signal: stall.signal
     }
   );
 
-  if (!response.ok || !response.body) {
-    throw new Error(
-      `Speckle object download failed: ${response.status} ${response.statusText}`
-    );
+  try {
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Speckle object download failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    return await consume(response.body);
+  } catch (error) {
+    if (stalled) {
+      throw new Error(
+        `Speckle stream stalled: no bytes received for ${STALL_TIMEOUT_MS / 1000}s`
+      );
+    }
+    throw error;
+  } finally {
+    if (stallTimer !== undefined) clearTimeout(stallTimer);
   }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
+  async function consume(
+    body: ReadableStream<Uint8Array>
+  ): Promise<LoadResult> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
 
-  let carry = "";
-  let bytes = 0;
-  let totalLines = 0;
-  let candidateLines = 0;
-  let indexedObjects = 0;
-  let indexedProperties = 0;
-  let skipped = 0;
-  let batch: IndexedObject[] = [];
+    let carry = "";
+    let bytes = 0;
+    let totalLines = 0;
+    let candidateLines = 0;
+    let indexedObjects = 0;
+    let indexedProperties = 0;
+    let skipped = 0;
+    let batch: IndexedObject[] = [];
 
-  const flush = async () => {
-    if (batch.length === 0) return;
-    const stats = await ingest(batch);
-    indexedObjects += stats.objects;
-    indexedProperties += stats.properties;
-    batch = [];
-    options.onProgress?.({ lines: totalLines, objects: indexedObjects });
-  };
+    const flush = async () => {
+      if (batch.length === 0) return;
+      const stats = await ingest(batch);
+      indexedObjects += stats.objects;
+      indexedProperties += stats.properties;
+      batch = [];
+      options.onProgress?.({ lines: totalLines, objects: indexedObjects });
+    };
 
-  const handleLine = async (line: string) => {
-    if (line.length === 0) return;
-    totalLines++;
+    const handleLine = async (line: string) => {
+      if (line.length === 0) return;
+      totalLines++;
 
-    // The cheap gate: reject geometry without parsing it.
-    if (!line.includes(DATA_OBJECT_MARKER)) return;
-    candidateLines++;
+      // The cheap gate: reject geometry without parsing it.
+      if (!line.includes(DATA_OBJECT_MARKER)) return;
+      candidateLines++;
 
-    const tab = line.indexOf("\t");
-    if (tab === -1) {
-      skipped++;
-      return;
+      const tab = line.indexOf("\t");
+      if (tab === -1) {
+        skipped++;
+        return;
+      }
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(line.slice(tab + 1)) as Record<string, unknown>;
+      } catch {
+        skipped++;
+        return;
+      }
+
+      const indexed = toIndexedObject(parsed);
+      if (!indexed) {
+        skipped++;
+        return;
+      }
+
+      batch.push(indexed);
+      if (batch.length >= BATCH_SIZE) await flush();
+    };
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      armStallTimer();
+      if (done) break;
+      bytes += value.byteLength;
+      carry += decoder.decode(value, { stream: true });
+
+      // Consume whole lines out of the carry buffer so it never grows beyond
+      // one partial line — this is what bounds memory across a 160 MB stream.
+      let newline: number;
+      while ((newline = carry.indexOf("\n")) !== -1) {
+        const line = carry.slice(0, newline);
+        carry = carry.slice(newline + 1);
+        await handleLine(line);
+      }
     }
 
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(line.slice(tab + 1)) as Record<string, unknown>;
-    } catch {
-      skipped++;
-      return;
-    }
+    carry += decoder.decode();
+    if (carry.length > 0) await handleLine(carry);
+    await flush();
 
-    const indexed = toIndexedObject(parsed);
-    if (!indexed) {
-      skipped++;
-      return;
-    }
-
-    batch.push(indexed);
-    if (batch.length >= BATCH_SIZE) await flush();
-  };
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    bytes += value.byteLength;
-    carry += decoder.decode(value, { stream: true });
-
-    // Consume whole lines out of the carry buffer so it never grows beyond
-    // one partial line — this is what bounds memory across a 160 MB stream.
-    let newline: number;
-    while ((newline = carry.indexOf("\n")) !== -1) {
-      const line = carry.slice(0, newline);
-      carry = carry.slice(newline + 1);
-      await handleLine(line);
-    }
+    return {
+      totalLines,
+      candidateLines,
+      indexedObjects,
+      indexedProperties,
+      skipped,
+      bytes,
+      elapsedMs: Date.now() - started
+    };
   }
-
-  carry += decoder.decode();
-  if (carry.length > 0) await handleLine(carry);
-  await flush();
-
-  return {
-    totalLines,
-    candidateLines,
-    indexedObjects,
-    indexedProperties,
-    skipped,
-    bytes,
-    elapsedMs: Date.now() - started
-  };
 }
