@@ -4,10 +4,10 @@
   "private": true,
   "description": "Model quality review for Speckle projects",
   "keywords": [
-    "speckle",
     "aec",
+    "agents",
     "cloudflare",
-    "agents"
+    "speckle"
   ],
   "license": "MIT",
   "type": "module",

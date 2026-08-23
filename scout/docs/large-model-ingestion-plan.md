@@ -125,12 +125,12 @@ step-result discipline.
 
 ## 4. Sequencing
 
-| Phase | What                                                                            | Gate                                                                                                                                          |
-| ----- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase | What                                                                            | Gate                                                                                                                                              |
+| ----- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | Workstream A entire (A1–A7)                                                     | Acceptance: pushing the 900 MB model yields a terminal, human-readable run status within minutes; no run can sit `running` past the reaper window |
-| 1     | Spike B1: can Speckle serve DataObjects-only, paginated? Measure real wire size | Decision: B1 vs B2                                                                                                                             |
-| 2     | Implement chosen ingest path + B4; raise/remove the A6 gate threshold           | 900 MB model indexes end-to-end                                                                                                                |
-| 3     | B3 only if Phase 2 metrics demand it                                            | —                                                                                                                                              |
+| 1     | Spike B1: can Speckle serve DataObjects-only, paginated? Measure real wire size | Decision: B1 vs B2                                                                                                                                |
+| 2     | Implement chosen ingest path + B4; raise/remove the A6 gate threshold           | 900 MB model indexes end-to-end                                                                                                                   |
+| 3     | B3 only if Phase 2 metrics demand it                                            | —                                                                                                                                                 |
 
 **Non-negotiable ordering:** A4 (the reaper) and A6 (the gate) ship before
 anyone pushes another large model. Everything else is improvement; those
