@@ -699,23 +699,29 @@ function SystemPlate() {
             className="idea-draw idea-draw-slow"
             style={delay(200)}
           />
-          {/* clockwise arrowheads between stations */}
+          {/* Clockwise arrowheads between stations. The positioning lives on
+              a wrapper group: a CSS entrance animation on the path itself
+              would override an attribute transform and dump every arrow at
+              the origin. */}
           {[54, -18, -90, 126, 198].map((angle) => {
             const at = point(angle, SYSTEM_R);
             const rad = (angle * Math.PI) / 180;
             const rot =
               (Math.atan2(Math.cos(rad), Math.sin(rad)) * 180) / Math.PI;
             return (
-              <path
+              <g
                 key={angle}
-                d="M-5 -3.5 L3 0 L-5 3.5"
-                fill="none"
-                stroke="var(--blue)"
-                strokeWidth={1.5}
                 transform={`translate(${at.x} ${at.y}) rotate(${rot})`}
-                className="idea-rise"
-                style={delay(1000)}
-              />
+              >
+                <path
+                  d="M-5 -3.5 L3 0 L-5 3.5"
+                  fill="none"
+                  stroke="var(--blue)"
+                  strokeWidth={1.5}
+                  className="idea-rise"
+                  style={delay(1000)}
+                />
+              </g>
             );
           })}
           {/* flanking ticks: the loop keeps moving past every station */}
