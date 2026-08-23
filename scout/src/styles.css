@@ -1255,12 +1255,12 @@ body,
 
 .idea-system-s3 {
   left: calc(50% + var(--ring) * 0.14);
-  top: calc(50% + var(--ring) * 0.36);
+  top: calc(50% + var(--ring) * 0.42);
 }
 
 .idea-system-s4 {
   right: calc(50% + var(--ring) * 0.14);
-  top: calc(50% + var(--ring) * 0.36);
+  top: calc(50% + var(--ring) * 0.42);
   text-align: right;
 }
 
