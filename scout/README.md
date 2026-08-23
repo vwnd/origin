@@ -76,9 +76,13 @@ end to end: when a new version is published to a model, it creates a
    `X-WEBHOOK-SIGNATURE` header — hex HMAC-SHA256 of the raw body.
 2. `handleSpeckleWebhook` verifies the signature against `SPECKLE_WEBHOOK_SECRET`
    (401 if it does not match).
-3. Events other than `commit_create` are acknowledged with 200 and ignored —
-   Speckle only retries on non-2xx.
-4. For a match, it calls `projectMutations.issues.createIssue` and returns 201.
+3. `issue_created` deliveries — any issue on the project, not only Scout's own —
+   are relayed to connected browsers over the events socket and return 200, so
+   the Inbox updates live instead of waiting on a reload.
+4. Other events are acknowledged with 200 and ignored — Speckle only retries
+   on non-2xx.
+5. For a `commit_create` match, it calls `projectMutations.issues.createIssue`
+   and returns 201.
 
 Speckle's UI shows the trigger as `version_create`, but the value on the wire is
 the legacy name `commit_create` — that is what the code matches on.
@@ -96,6 +100,7 @@ Non-secret settings live in `src/speckle/config.ts`:
 | `SPECKLE_SERVER_URL`    | Speckle server. Change for self-hosted.     |
 | `SPECKLE_WEBHOOK_PATH`  | Path the webhook posts to.                  |
 | `VERSION_CREATED_EVENT` | Wire name of the trigger (`commit_create`). |
+| `ISSUE_CREATED_EVENT`   | Wire name of the trigger (`issue_created`). |
 
 Secrets are Worker secrets, not config (see `.dev.vars.example`):
 
@@ -111,7 +116,7 @@ For local development, copy `.dev.vars.example` to `.dev.vars` and fill it in.
 In the Speckle project: **Settings → Webhooks → Create webhook**
 
 - **URL** — `https://<your-worker>.workers.dev/webhooks/speckle`
-- **Events** — `version_create`
+- **Events** — `version_create`, `issue_created`
 - **Secret** — the same value you stored as `SPECKLE_WEBHOOK_SECRET`
 
 You cannot read the secret back after saving it, so store it when you create it.
@@ -124,15 +129,16 @@ lines, and its analytics row all join up.
 
 **Outcomes**, the one value to group by:
 
-| Outcome           | Status | Meaning                         |
-| ----------------- | ------ | ------------------------------- |
-| `issue_created`   | 201    | Matched, issue created          |
-| `ignored_event`   | 200    | Event we do not act on          |
-| `ignored_payload` | 200    | Right event, missing fields     |
-| `bad_signature`   | 401    | HMAC did not verify             |
-| `bad_request`     | 400    | Unparseable body or payload     |
-| `not_configured`  | 500    | Missing token or webhook secret |
-| `speckle_error`   | 502    | Speckle rejected issue creation |
+| Outcome           | Status | Meaning                           |
+| ----------------- | ------ | --------------------------------- |
+| `issue_created`   | 201    | Matched, issue created            |
+| `issue_synced`    | 200    | Speckle issue event relayed to UI |
+| `ignored_event`   | 200    | Event we do not act on            |
+| `ignored_payload` | 200    | Right event, missing fields       |
+| `bad_signature`   | 401    | HMAC did not verify               |
+| `bad_request`     | 400    | Unparseable body or payload       |
+| `not_configured`  | 500    | Missing token or webhook secret   |
+| `speckle_error`   | 502    | Speckle rejected issue creation   |
 
 **Logs** — structured JSON, one object per line, via Workers Logs
 (`observability` is enabled at a 1.0 sampling rate):

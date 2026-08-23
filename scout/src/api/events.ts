@@ -46,6 +46,14 @@ export type ScoutEvent =
       versionId: string;
       error: string;
       at: string;
+    }
+  | {
+      type: "issue_synced";
+      projectId: string;
+      issueId: string | null;
+      identifier: string | null;
+      title: string | null;
+      at: string;
     };
 
 export class EventsAgent extends Agent<Env> {

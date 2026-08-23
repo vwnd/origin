@@ -137,6 +137,37 @@ export function toPublishedVersion(
   };
 }
 
+/** Narrowed view of an `issue_created` event — Scout's own issues included. */
+export type NotifiedIssue = {
+  projectId: string;
+  issueId: string | null;
+  identifier: string | null;
+  title: string | null;
+};
+
+/**
+ * Pull whatever identifies the issue out of an `issue_created` payload.
+ *
+ * Read as tolerantly as `toPublishedVersion` does: the exact shape Speckle
+ * sends for this trigger isn't pinned down anywhere Scout's code depends on,
+ * so degrade to `null` fields rather than dropping the notification — the
+ * Inbox refresh this drives matters more than the toast text.
+ */
+export function toNotifiedIssue(payload: SpeckleWebhookPayload): NotifiedIssue {
+  const data = payload.event.data;
+  const sources = [
+    isRecord(data) && isRecord(data.issue) ? data.issue : null,
+    isRecord(data) ? data : null
+  ].filter((s): s is Record<string, unknown> => s !== null);
+
+  return {
+    projectId: payload.streamId,
+    issueId: pick(sources, "id", "issueId"),
+    identifier: pick(sources, "identifier"),
+    title: pick(sources, "title")
+  };
+}
+
 /**
  * Compact description of `event.data` for diagnostics, so an unexpected payload
  * shape can be identified from the logs without dumping the whole delivery.

@@ -1,11 +1,20 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowUpRight, ChevronRight } from "lucide-react";
 import { api, type Issue } from "@/lib/api";
 import { parseFindings, type ParsedFinding } from "@/lib/findings";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -18,6 +27,7 @@ import {
 import { EmptyState } from "@/components/empty-state";
 
 const SPECKLE_BASE = "https://app.speckle.systems";
+const PAGE_SIZE = 10;
 
 /*
  * A ramp rather than a palette: settled work greys out, open work takes a
@@ -37,6 +47,23 @@ function relativeTime(iso: string): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
+}
+
+/** Page numbers to show, with `"ellipsis"` standing in for a skipped run. */
+function paginationRange(
+  current: number,
+  total: number
+): (number | "ellipsis")[] {
+  const range: (number | "ellipsis")[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+
+  if (start > 2) range.push("ellipsis");
+  for (let page = start; page <= end; page++) range.push(page);
+  if (end < total - 1) range.push("ellipsis");
+  if (total > 1) range.push(total);
+
+  return range;
 }
 
 const SEVERITY_DOT: Record<ParsedFinding["severity"], string> = {
@@ -109,11 +136,17 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
   const [issues, setIssues] = useState<Issue[] | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  // Adjusted during render, not an effect: resetting page state when a prop
+  // changes is exactly the case React's docs call out for this pattern.
+  const [pageResetKey, setPageResetKey] = useState(refreshKey);
+  if (refreshKey !== pageResetKey) {
+    setPageResetKey(refreshKey);
+    setPage(1);
+  }
 
   const load = useCallback(async () => {
-    setBusy(true);
     try {
       const data = await api.listIssues();
       setIssues(data.issues);
@@ -121,8 +154,6 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
     }
   }, []);
 
@@ -134,19 +165,20 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
     return () => clearTimeout(timer);
   }, [load, refreshKey]);
 
+  const totalPages = issues
+    ? Math.max(1, Math.ceil(issues.length / PAGE_SIZE))
+    : 1;
+  const currentPage = Math.min(page, totalPages);
+  const pageIssues =
+    issues?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE) ?? [];
+
   return (
     <div className="space-y-4">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl leading-none">Inbox</h1>
-          <p className="text-sm text-muted-foreground">
-            Issues Scout has filed on this project.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={busy}>
-          <RefreshCw className={busy ? "size-4 animate-spin" : "size-4"} />
-          Refresh
-        </Button>
+      <header>
+        <h1 className="font-serif text-3xl leading-none">Inbox</h1>
+        <p className="text-sm text-muted-foreground">
+          Issues Scout has filed on this project.
+        </p>
       </header>
 
       <Card>
@@ -185,7 +217,7 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {issues.map((issue) => {
+              {pageIssues.map((issue) => {
                 const findings = parseFindings(issue.rawDescription);
                 const isOpen = expanded === issue.id;
                 return (
@@ -233,12 +265,14 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
                       <TableCell>
                         {projectId ? (
                           <a
-                            href={`${SPECKLE_BASE}/projects/${projectId}/issues/${issue.id}`}
+                            // Speckle has no per-issue URL — only the project's
+                            // issue list, where this identifier can be found.
+                            href={`${SPECKLE_BASE}/projects/${projectId}/issues`}
                             target="_blank"
                             rel="noreferrer"
                             onClick={(event) => event.stopPropagation()}
                             className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                            aria-label={`Open ${issue.identifier} in Speckle`}
+                            aria-label={`Open ${issue.identifier} in Speckle's issue list`}
                           >
                             <ArrowUpRight className="size-4" />
                           </a>
@@ -259,6 +293,48 @@ export function Inbox({ refreshKey }: { refreshKey: number }) {
             </TableBody>
           </Table>
         )}
+
+        {issues && totalPages > 1 ? (
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </p>
+            <Pagination className="mx-0 w-auto">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    disabled={currentPage === 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  />
+                </PaginationItem>
+
+                {paginationRange(currentPage, totalPages).map((entry, index) =>
+                  entry === "ellipsis" ? (
+                    <PaginationItem key={`ellipsis-${index}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={entry}>
+                      <PaginationLink
+                        isActive={entry === currentPage}
+                        onClick={() => setPage(entry)}
+                      >
+                        {entry}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+                <PaginationItem>
+                  <PaginationNext
+                    disabled={currentPage === totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        ) : null}
       </Card>
     </div>
   );

@@ -14,6 +14,7 @@ import type { Logger } from "./logging";
  */
 export type DeliveryOutcome =
   | "issue_created" // matched and an issue was created
+  | "issue_synced" // relayed a Speckle issue_created event to the UI
   | "not_configured" // missing token or webhook secret
   | "bad_signature" // HMAC did not verify
   | "bad_request" // unparseable body or payload

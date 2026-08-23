@@ -1,8 +1,13 @@
-import { SPECKLE_WEBHOOK_PATH, VERSION_CREATED_EVENT } from "./config";
+import {
+  ISSUE_CREATED_EVENT,
+  SPECKLE_WEBHOOK_PATH,
+  VERSION_CREATED_EVENT
+} from "./config";
 import { SIGNATURE_HEADER, verifySignature } from "./signature";
 import {
   describeEventData,
   parseWebhookEnvelope,
+  toNotifiedIssue,
   toPublishedVersion
 } from "./types";
 import { recordDelivery, type DeliveryMetrics } from "./analytics";
@@ -134,6 +139,26 @@ async function processDelivery(
 
   const { payload } = envelope;
   const eventName = payload.event.event_name;
+
+  // Any issue landing on the project — Scout's own or someone else's — should
+  // wake up the Inbox live rather than wait for a page reload.
+  if (eventName === ISSUE_CREATED_EVENT) {
+    const issue = toNotifiedIssue(payload);
+    logger.info("issue_synced", issue);
+    await publishEvent(env, {
+      type: "issue_synced",
+      ...issue,
+      at: new Date().toISOString()
+    });
+    return {
+      status: 200,
+      body: { synced: true },
+      outcome: "issue_synced",
+      eventName,
+      projectId: issue.projectId,
+      issueIdentifier: issue.identifier
+    };
+  }
 
   // No project filter: the webhook lives inside one Speckle project, so every
   // delivery already belongs to the project named by `payload.streamId`.

@@ -31,3 +31,11 @@ export const SPECKLE_WEBHOOK_PATH = "/webhooks/speckle";
  * The web UI displays this trigger as `version_create`.
  */
 export const VERSION_CREATED_EVENT = "commit_create";
+
+/**
+ * Speckle's event name for "an issue was created on the project" — any issue,
+ * not only ones Scout filed. Already ticked on the project webhook alongside
+ * `issue_updated`, `issue_reply_created` and `issue_deleted`; only this one is
+ * acted on today.
+ */
+export const ISSUE_CREATED_EVENT = "issue_created";

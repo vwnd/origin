@@ -62,6 +62,13 @@ function Shell() {
         toast.error("Inspection failed", { description: event.error });
         setRefreshKey((key) => key + 1);
         break;
+
+      // Speckle fires this for every issue on the project, including the
+      // ones Scout just filed itself — which already get their own toast
+      // above from run_complete, so this only needs to refresh the list.
+      case "issue_synced":
+        setRefreshKey((key) => key + 1);
+        break;
     }
   }, []);
 
@@ -106,12 +113,17 @@ function Shell() {
                 : "Reconnecting to the event stream"
             }
           >
-            <span
-              className={cn(
-                "size-1.5 rounded-full",
-                connected ? "bg-primary" : "bg-muted-foreground/40"
-              )}
-            />
+            <span className="relative flex size-1.5">
+              {connected ? (
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+              ) : null}
+              <span
+                className={cn(
+                  "relative inline-flex size-1.5 rounded-full",
+                  connected ? "bg-primary" : "bg-muted-foreground/40"
+                )}
+              />
+            </span>
             {connected ? "Live" : "Offline"}
           </span>
         </div>
