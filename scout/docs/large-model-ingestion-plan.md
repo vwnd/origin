@@ -136,3 +136,63 @@ step-result discipline.
 anyone pushes another large model. Everything else is improvement; those
 two are the difference between a system that fails and a system that lies
 about failing.
+
+---
+
+## 5. Phase 1 spike results (2026-08-23)
+
+Phase 0 shipped (`4955c2a`). The spike ran live against
+`app.speckle.systems` with `scripts/spike-selective-walk.mjs`. Verdict:
+**B1 is feasible — via REST, not GraphQL. B2 (R2 staging) is not needed.**
+
+**The GraphQL avenue is dead.** The server no longer exposes any
+object-graph query: no `Query.stream`, no `Project.object`, no
+`Object.children`. The `Object` type survives with five scalar fields.
+
+**The REST surface is sufficient**, and it speaks the loader's language:
+
+- `GET /objects/{projectId}/{rootId}/single` returns the root object alone —
+  including its full `__closure` (every descendant id) and the proxy tables.
+- `POST /api/getobjects/{projectId}` (body `{ objects: "[ids...]" }`,
+  `Accept: text/plain`) returns any batch of ids as the same `{id}\t{json}`
+  lines the loader already parses.
+
+**Geometry hangs in exactly two places** in a Revit v3 commit, both
+prunable before download: `displayValue` references on elements, and one
+collection literally named `definitionGeometry` (instance-definition
+meshes; its element count matches `instanceDefinitionProxies` 1:1).
+A breadth-first walk over `reference` nodes that skips both fetches **zero
+meshes** — verified by type tally.
+
+**Measurements** (selective walk vs. today's full stream):
+
+| Model                              | Packfile | Children | Selective wire | Objects fetched             | Requests | Time |
+| ---------------------------------- | -------- | -------- | -------------- | --------------------------- | -------- | ---- |
+| ARCH-CARTER-PRIMARY (`3ed937f226`) | 862.7 MB | 64,593   | **122.5 MB**   | 20,826 (19,742 DataObjects) | 45       | 35 s |
+| Snowdon Towers (`02a7431fac`)      | 160.7 MB | 7,781    | **49.8 MB**    | 8,524 (7,574 DataObjects)   | 20       | 19 s |
+
+7× less wire on the model that killed the pipeline — and the reduction
+grows with model size, because geometry's share grows. Every byte fetched
+is data the index actually wants.
+
+### Consequences for Phase 2
+
+- Replace the single-stream load with the batched walk, run as a **loop of
+  workflow steps**: each step drains up to N frontier ids through
+  `getobjects`, ingests DataObjects, enqueues newly discovered references,
+  and returns counts only (the 1 MiB step-result cap stands). Bounded CPU
+  and wall time per step; a retry re-fetches one slice, not the model.
+- **The frontier lives in the InspectionAgent** (new SQLite table), not in
+  step returns — it can exceed the step-result cap on large models, and the
+  DO is already the run's durable scratch space. Drain must be
+  mark-then-delete so a retried step re-reads the same slice;
+  `ingestBatch` is already `INSERT OR REPLACE`, so re-ingesting is safe.
+- Keep the streaming loader as the fallback path for non-Revit commits
+  whose structure the walk's prune rules don't know.
+- **Gate recalibration:** children count is a weak size proxy (64.6 k
+  children at 863 MB vs 7.8 k at 161 MB — an 8× count spread for a 5×
+  byte spread, in the wrong direction per object). Keep the packfile-bytes
+  bound as primary. After Phase 2, the binding quantity becomes DataObject
+  wire size, so the byte cap can rise roughly 7×.
+- Subrequest budgets are a non-issue: 45 requests covered the 863 MB
+  model, far under the per-invocation limit even in a single step.
