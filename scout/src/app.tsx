@@ -83,7 +83,11 @@ function Shell() {
        */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-baseline gap-8 px-6 py-3.5">
-          <Link to="/" className="font-serif text-2xl leading-none">
+          {/* The wordmark as it appears on the landing plate: paper on blue. */}
+          <Link
+            to="/"
+            className="bg-primary px-3 py-1.5 font-serif text-2xl leading-none text-primary-foreground transition-colors hover:bg-foreground hover:text-background"
+          >
             Origo
           </Link>
 
