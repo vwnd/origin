@@ -196,3 +196,49 @@ is data the index actually wants.
   wire size, so the byte cap can rise roughly 7×.
 - Subrequest budgets are a non-issue: 45 requests covered the 863 MB
   model, far under the per-invocation limit even in a single step.
+
+---
+
+## 6. Phase 2 shipped (2026-08-23)
+
+The selective walk is now the primary ingest path for Revit versions
+(`src/inspection/walker.ts` + `walkVersion` in the workflow). The streaming
+loader remains as the fallback for source applications whose commit
+structure the walk's prune rules do not know.
+
+**Mechanics.** `walk-seed` fetches the root via `/single`, ingests it if it
+is a DataObject, and seeds the frontier with its references. The frontier
+lives in the InspectionAgent's SQLite (`frontier` table — work queue and
+dedupe set in one; rows go pending → claimed → done and are never deleted
+mid-run). The workflow then loops `walk-chunk-N` steps, each claiming up to
+10,000 ids, fetching them through `getobjects` in batches of 500, ingesting
+DataObjects, and enqueueing newly discovered references. Every mutation is
+idempotent (enqueue is INSERT OR IGNORE, ingest is INSERT OR REPLACE, a
+claimed-but-unfinished slice is re-served on retry), so a step retry re-does
+one bounded slice, never the model. A `walk-finish` step closes the DO run
+row; heartbeats land between chunks.
+
+**Gates split by path**: walk → 2M-object runaway cap only; stream → the
+Phase 0 bounds (500k objects / 500 MB packfile) with a message noting only
+Revit takes the walk today.
+
+**Acceptance run** (local `wrangler dev`, real Speckle + Anthropic):
+
+|            | ARCH-CARTER-PRIMARY (863 MB)                                   |
+| ---------- | -------------------------------------------------------------- |
+| Before     | Workflow stuck indefinitely, no terminal state                 |
+| After      | **`complete` in 3 m 31 s** end-to-end                          |
+| Indexed    | 19,742 objects · 364,071 properties · 122.5 MB wire · 6 chunks |
+| Inspection | 37 findings · 500 deltas attached · issue AEC-18 · $0.88       |
+
+The Snowdon reference model also ran through the walk path: identical index
+to the streaming loader (7,574 objects) from 49.8 MB instead of 125 MB.
+
+The failed-run handling from Phase 0 was exercised for real along the way:
+two runs whose inspect step died (invalid API key during local testing)
+landed as `failed` rows with the error preserved — no stuck `running` rows.
+
+**Deploy checklist**: `wrangler d1 migrations apply scout-metadata --remote`
+(migration 0003, heartbeat column) must run before or with the next deploy.
+The InspectionAgent schema bump (v3, frontier table) migrates itself on
+first contact per version object.

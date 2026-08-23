@@ -19,6 +19,8 @@ import { loadEnabledScouts } from "../scouts/store";
 import { publishEvent } from "../api/events";
 import { updateRun } from "../api/runs";
 import { loadVersionIntoIndex } from "./loader";
+import { fetchRootObject, refsOf, walkChunk } from "./walker";
+import { toIndexedObject } from "./properties";
 import { runInstruction } from "./inspect";
 import {
   collapseDuplicates,
@@ -75,6 +77,27 @@ const INSPECT_STEP: WorkflowStepConfig = {
   timeout: "20 minutes"
 };
 
+/** Root fetch + frontier seed. The root's closure can be several MB. */
+const WALK_SEED_STEP: WorkflowStepConfig = {
+  retries: { limit: 2, delay: "10 seconds", backoff: "exponential" },
+  timeout: "5 minutes"
+};
+
+/** One frontier chunk: ~20 getobjects requests plus ingest RPCs. */
+const WALK_CHUNK_STEP: WorkflowStepConfig = {
+  retries: { limit: 3, delay: "10 seconds", backoff: "exponential" },
+  timeout: "10 minutes"
+};
+
+/** Frontier ids fetched per walk step — bounds CPU and wall time per step. */
+const WALK_CHUNK_IDS = 10_000;
+
+/** Ids per enqueue RPC, keeping Durable Object call payloads modest. */
+const ENQUEUE_SLICE = 5_000;
+
+/** Runaway guard: 500 chunks x 10k ids is far beyond any real model. */
+const MAX_WALK_CHUNKS = 500;
+
 /** Delta building queries the DO per finding before one Speckle mutation. */
 const DELTAS_STEP: WorkflowStepConfig = {
   retries: { limit: 2, delay: "10 seconds", backoff: "exponential" },
@@ -82,14 +105,15 @@ const DELTAS_STEP: WorkflowStepConfig = {
 };
 
 /**
- * Versions larger than this are declined up front with a `too_large` run
- * instead of dying mid-stream on the CPU limit. Calibration-pending: the
- * 160 MB reference model indexes comfortably; the 900 MB one does not. Both
- * bounds are logged on every run so the ceiling can be tuned from data.
- * Remove once chunked ingestion (Workstream B) lands.
+ * Size gates. Revit versions take the selective walk (geometry never
+ * travels, chunked steps), so only a runaway bound on object count applies.
+ * Everything else still takes the single-step streaming load, whose CPU
+ * ceiling the Phase 1 measurements put near these bounds — see
+ * docs/large-model-ingestion-plan.md.
  */
-const MAX_TOTAL_CHILDREN = 500_000;
-const MAX_PACKFILE_BYTES = 500 * 1024 * 1024;
+const MAX_WALK_CHILDREN = 2_000_000;
+const MAX_STREAM_CHILDREN = 500_000;
+const MAX_STREAM_PACKFILE_BYTES = 500 * 1024 * 1024;
 
 /**
  * Whether findings already reported in an open issue are suppressed.
@@ -197,27 +221,41 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
         modelName: found.model?.name ?? null,
         totalChildrenCount: found.totalChildrenCount,
         packfileBytes: found.packfileSize ? Number(found.packfileSize) : null,
+        sourceApplication: found.sourceApplication,
         // Required by the resource-meta mutation that attaches the deltas.
         workspaceId: info.workspaceId
       };
     });
 
-    // Size gate: decline up front what the streaming load cannot survive, as
-    // a graceful terminal state rather than an hour of retry churn. Logged on
+    // Revit commits take the selective walk: geometry is never downloaded and
+    // the work is spread across bounded steps. Other source applications keep
+    // the streaming load — the walk's prune rules only know Revit's shape.
+    const useWalk = (version.sourceApplication ?? "")
+      .toLowerCase()
+      .includes("revit");
+
+    // Size gate: decline up front what the chosen path cannot survive, as a
+    // graceful terminal state rather than an hour of retry churn. Logged on
     // every run — over or under — so the thresholds can be calibrated.
     logger.info("version_size", {
       model: version.modelName,
       totalChildrenCount: version.totalChildrenCount,
-      packfileBytes: version.packfileBytes
+      packfileBytes: version.packfileBytes,
+      sourceApplication: version.sourceApplication,
+      path: useWalk ? "walk" : "stream"
     });
-    const tooLarge =
-      (version.totalChildrenCount ?? 0) > MAX_TOTAL_CHILDREN ||
-      (version.packfileBytes ?? 0) > MAX_PACKFILE_BYTES;
+    const tooLarge = useWalk
+      ? (version.totalChildrenCount ?? 0) > MAX_WALK_CHILDREN
+      : (version.totalChildrenCount ?? 0) > MAX_STREAM_CHILDREN ||
+        (version.packfileBytes ?? 0) > MAX_STREAM_PACKFILE_BYTES;
     if (tooLarge) {
-      const message =
-        `Version is too large to index: ${version.totalChildrenCount ?? "?"} objects` +
-        ` (cap ${MAX_TOTAL_CHILDREN}), packfile ${version.packfileBytes ?? "?"} bytes` +
-        ` (cap ${MAX_PACKFILE_BYTES}). Raising the cap needs chunked ingestion.`;
+      const message = useWalk
+        ? `Version is too large to index: ${version.totalChildrenCount ?? "?"} objects` +
+          ` exceeds the walk's runaway cap of ${MAX_WALK_CHILDREN}.`
+        : `Version is too large to stream: ${version.totalChildrenCount ?? "?"} objects` +
+          ` (cap ${MAX_STREAM_CHILDREN}), packfile ${version.packfileBytes ?? "?"} bytes` +
+          ` (cap ${MAX_STREAM_PACKFILE_BYTES}). Only Revit versions take the` +
+          ` selective walk today.`;
       logger.warn("run_too_large", { model: version.modelName });
       await updateRun(this.env, event.instanceId, {
         status: "too_large",
@@ -235,42 +273,12 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
       return { outcome: "too_large" as const, load: null };
     }
 
-    const load = await step.do("index-version", LOAD_STEP, async () => {
-      const agent = await getAgentByName<Env, InspectionAgent>(
-        this.env.InspectionAgent,
-        versionId
-      );
-      await agent.beginRun(versionId, projectId);
-
-      // Heartbeat: proof of life for the reaper and the UI. Throttled and
-      // fire-and-forget — a lost beat must never fail the load.
-      let lastBeat = 0;
-      const result = await loadVersionIntoIndex({
-        token: this.env.SPECKLE_TOKEN,
-        projectId,
-        rootObjectId: version.rootObjectId,
-        ingest: (batch) => agent.ingestBatch(batch),
-        onProgress: ({ objects }) => {
-          const now = Date.now();
-          if (now - lastBeat < 30_000) return;
-          lastBeat = now;
-          void updateRun(this.env, event.instanceId, {
-            heartbeat: true,
-            indexedObjects: objects
-          }).catch(() => {});
-        }
-      });
-
-      await agent.finishRun("indexed");
-      return {
-        indexedObjects: result.indexedObjects,
-        indexedProperties: result.indexedProperties,
-        megabytes: Math.round(result.bytes / 100_000) / 10,
-        elapsedMs: result.elapsedMs
-      };
-    });
+    const load = useWalk
+      ? await this.walkVersion(event, step, logger, version.rootObjectId)
+      : await this.streamVersion(event, step, version.rootObjectId);
 
     logger.info("index_complete", { ...load, model: version.modelName });
+
     await updateRun(this.env, event.instanceId, {
       status: "inspecting",
       modelName: version.modelName,
@@ -480,6 +488,186 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
       findings: novel.findings.length,
       deltas: meta.attached,
       load
+    };
+  }
+
+  /** What both index paths report back to the pipeline. */
+  private async agentFor(versionId: string) {
+    return getAgentByName<Env, InspectionAgent>(
+      this.env.InspectionAgent,
+      versionId
+    );
+  }
+
+  /**
+   * The original single-step streaming load. Kept for non-Revit commits,
+   * whose object graphs the walk's prune rules do not know.
+   */
+  private async streamVersion(
+    event: WorkflowEvent<InspectionParams>,
+    step: WorkflowStep,
+    rootObjectId: string
+  ) {
+    const { projectId, versionId } = event.payload;
+
+    return step.do("index-version", LOAD_STEP, async () => {
+      const agent = await this.agentFor(versionId);
+      await agent.beginRun(versionId, projectId);
+
+      // Heartbeat: proof of life for the reaper and the UI. Throttled and
+      // fire-and-forget — a lost beat must never fail the load.
+      let lastBeat = 0;
+      const result = await loadVersionIntoIndex({
+        token: this.env.SPECKLE_TOKEN,
+        projectId,
+        rootObjectId,
+        ingest: (batch) => agent.ingestBatch(batch),
+        onProgress: ({ objects }) => {
+          const now = Date.now();
+          if (now - lastBeat < 30_000) return;
+          lastBeat = now;
+          void updateRun(this.env, event.instanceId, {
+            heartbeat: true,
+            indexedObjects: objects
+          }).catch(() => {});
+        }
+      });
+
+      await agent.finishRun("indexed");
+      return {
+        indexedObjects: result.indexedObjects,
+        indexedProperties: result.indexedProperties,
+        megabytes: Math.round(result.bytes / 100_000) / 10,
+        elapsedMs: result.elapsedMs
+      };
+    });
+  }
+
+  /**
+   * The selective walk: seed the frontier from the root object, then drain
+   * it in bounded chunks — one workflow step each, so a retry re-fetches one
+   * slice instead of the whole model, and CPU per invocation stays far under
+   * the limit that killed the streaming load at 863 MB.
+   *
+   * Every mutation along the way is idempotent (frontier enqueue is INSERT OR
+   * IGNORE, ingest is INSERT OR REPLACE, claims survive a dead attempt), so
+   * step retries are safe by construction.
+   */
+  private async walkVersion(
+    event: WorkflowEvent<InspectionParams>,
+    step: WorkflowStep,
+    logger: Logger,
+    rootObjectId: string
+  ) {
+    const { projectId, versionId } = event.payload;
+
+    const seed = await step.do("walk-seed", WALK_SEED_STEP, async () => {
+      const agent = await this.agentFor(versionId);
+      await agent.beginRun(versionId, projectId);
+
+      const root = await fetchRootObject({
+        token: this.env.SPECKLE_TOKEN,
+        projectId,
+        rootObjectId
+      });
+      // A root that is itself a DataObject (single-element publish) still
+      // belongs in the index.
+      const indexed = toIndexedObject(root.object);
+      if (indexed) await agent.ingestBatch([indexed]);
+      const enqueued = await agent.enqueueFrontier(refsOf(root.object));
+      return { enqueued, bytes: root.bytes, indexed: indexed ? 1 : 0 };
+    });
+
+    const totals = {
+      indexedObjects: seed.indexed,
+      indexedProperties: 0,
+      bytes: seed.bytes,
+      requests: 1,
+      elapsedMs: 0
+    };
+
+    for (let chunk = 0; ; chunk++) {
+      if (chunk >= MAX_WALK_CHUNKS) {
+        throw new Error(
+          `Walk exceeded ${MAX_WALK_CHUNKS} chunks — runaway frontier?`
+        );
+      }
+
+      const result = await step.do(
+        `walk-chunk-${chunk}`,
+        WALK_CHUNK_STEP,
+        async () => {
+          const started = Date.now();
+          const agent = await this.agentFor(versionId);
+          const ids = await agent.claimFrontier(WALK_CHUNK_IDS);
+          if (ids.length === 0) {
+            return {
+              fetched: 0,
+              indexedObjects: 0,
+              indexedProperties: 0,
+              bytes: 0,
+              requests: 0,
+              enqueued: 0,
+              remaining: 0,
+              elapsedMs: 0
+            };
+          }
+
+          const walked = await walkChunk({
+            token: this.env.SPECKLE_TOKEN,
+            projectId,
+            ids,
+            ingest: (batch) => agent.ingestBatch(batch)
+          });
+
+          let enqueued = 0;
+          for (let i = 0; i < walked.refs.length; i += ENQUEUE_SLICE) {
+            enqueued += await agent.enqueueFrontier(
+              walked.refs.slice(i, i + ENQUEUE_SLICE)
+            );
+          }
+          await agent.completeClaimed();
+          const remaining = await agent.frontierRemaining();
+
+          return {
+            fetched: walked.fetched,
+            indexedObjects: walked.indexedObjects,
+            indexedProperties: walked.indexedProperties,
+            bytes: walked.bytes,
+            requests: walked.requests,
+            enqueued,
+            remaining,
+            elapsedMs: Date.now() - started
+          };
+        }
+      );
+
+      totals.indexedObjects += result.indexedObjects;
+      totals.indexedProperties += result.indexedProperties;
+      totals.bytes += result.bytes;
+      totals.requests += result.requests;
+      totals.elapsedMs += result.elapsedMs;
+
+      logger.info("walk_chunk", { chunk, ...result });
+      // Between-step heartbeat: chunks are the walk's unit of liveness.
+      await updateRun(this.env, event.instanceId, {
+        heartbeat: true,
+        indexedObjects: totals.indexedObjects
+      });
+
+      if (result.remaining === 0) break;
+    }
+
+    await step.do("walk-finish", API_STEP, async () => {
+      const agent = await this.agentFor(versionId);
+      await agent.finishRun("indexed");
+    });
+
+    return {
+      indexedObjects: totals.indexedObjects,
+      indexedProperties: totals.indexedProperties,
+      megabytes: Math.round(totals.bytes / 100_000) / 10,
+      elapsedMs: totals.elapsedMs
     };
   }
 }

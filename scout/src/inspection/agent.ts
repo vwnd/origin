@@ -58,7 +58,16 @@ export type ValueCount = {
  * rebuilt from Speckle per version — so the correct response to a mismatch is
  * to drop and recreate rather than migrate in place.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
+
+/**
+ * Frontier row lifecycle for the selective walk. The table doubles as the
+ * dedupe set: rows are never deleted during a run, so an id that was already
+ * fetched (or is in flight) can never be enqueued twice.
+ */
+const FRONTIER_PENDING = 0;
+const FRONTIER_CLAIMED = 1;
+const FRONTIER_DONE = 2;
 
 export class InspectionAgent extends Agent<Env> {
   /**
@@ -88,6 +97,7 @@ export class InspectionAgent extends Agent<Env> {
       this.db.exec("DROP TABLE IF EXISTS properties;");
       this.db.exec("DROP TABLE IF EXISTS objects;");
       this.db.exec("DROP TABLE IF EXISTS run;");
+      this.db.exec("DROP TABLE IF EXISTS frontier;");
       this.db.exec("DELETE FROM schema_meta;");
       this.db.exec(
         "INSERT INTO schema_meta (version) VALUES (?);",
@@ -124,6 +134,15 @@ export class InspectionAgent extends Agent<Env> {
         "findings_json TEXT, issue_identifier TEXT," +
         "started_at TEXT, finished_at TEXT, error TEXT);"
     );
+    // The selective walk's work queue and dedupe set in one. Durable here
+    // because the frontier can exceed the 1 MiB workflow step-result cap.
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS frontier (" +
+        "id TEXT PRIMARY KEY, state INTEGER NOT NULL DEFAULT 0);"
+    );
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_frontier_state ON frontier(state);"
+    );
 
     this.schemaChecked = true;
   }
@@ -135,6 +154,7 @@ export class InspectionAgent extends Agent<Env> {
       this.db.exec("DELETE FROM properties;");
       this.db.exec("DELETE FROM objects;");
       this.db.exec("DELETE FROM run;");
+      this.db.exec("DELETE FROM frontier;");
       this.db.exec(
         "INSERT INTO run (version_id, project_id, status, started_at) VALUES (?, ?, 'indexing', ?);",
         versionId,
@@ -198,6 +218,93 @@ export class InspectionAgent extends Agent<Env> {
     });
 
     return { objects: batch.length, properties: propertyCount };
+  }
+
+  // ---------------------------------------------------------------------
+  // Frontier for the selective walk (see walker.ts). One workflow drives one
+  // version's agent, so claims never race; the states exist so a retried
+  // step re-reads exactly the slice its dead predecessor was working on.
+  // ---------------------------------------------------------------------
+
+  /** Add ids not seen before this run. Idempotent: re-adding is a no-op. */
+  async enqueueFrontier(ids: string[]): Promise<number> {
+    this.ensureTables();
+    if (ids.length === 0) return 0;
+
+    let added = 0;
+    this.ctx.storage.transactionSync(() => {
+      for (let i = 0; i < ids.length; i += MAX_BOUND_PARAMETERS) {
+        const chunk = ids.slice(i, i + MAX_BOUND_PARAMETERS);
+        const placeholders = chunk
+          .map(() => `(?, ${FRONTIER_PENDING})`)
+          .join(",");
+        const result = this.db.exec(
+          "INSERT OR IGNORE INTO frontier (id, state) VALUES " +
+            placeholders +
+            ";",
+          ...chunk
+        );
+        added += result.rowsWritten;
+      }
+    });
+    return added;
+  }
+
+  /**
+   * Ids for the next walk chunk. Previously claimed but never completed ids
+   * come back first — that is the retry path — topped up from pending.
+   */
+  async claimFrontier(limit: number): Promise<string[]> {
+    this.ensureTables();
+    const claimed = this.db
+      .exec<{ id: string }>(
+        "SELECT id FROM frontier WHERE state = ? LIMIT ?;",
+        FRONTIER_CLAIMED,
+        limit
+      )
+      .toArray()
+      .map((row) => row.id);
+
+    const topUp = limit - claimed.length;
+    if (topUp > 0) {
+      this.db.exec(
+        "UPDATE frontier SET state = ? WHERE id IN " +
+          "(SELECT id FROM frontier WHERE state = ? LIMIT ?);",
+        FRONTIER_CLAIMED,
+        FRONTIER_PENDING,
+        topUp
+      );
+      return this.db
+        .exec<{ id: string }>(
+          "SELECT id FROM frontier WHERE state = ? LIMIT ?;",
+          FRONTIER_CLAIMED,
+          limit
+        )
+        .toArray()
+        .map((row) => row.id);
+    }
+    return claimed;
+  }
+
+  /** Mark the claimed slice done. Called once its chunk fully succeeded. */
+  async completeClaimed(): Promise<void> {
+    this.ensureTables();
+    this.db.exec(
+      "UPDATE frontier SET state = ? WHERE state = ?;",
+      FRONTIER_DONE,
+      FRONTIER_CLAIMED
+    );
+  }
+
+  /** Ids still to fetch: pending plus any claimed-but-unfinished slice. */
+  async frontierRemaining(): Promise<number> {
+    this.ensureTables();
+    return this.db
+      .exec<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM frontier WHERE state != ?;",
+        FRONTIER_DONE
+      )
+      .one().n;
   }
 
   async finishRun(status: string, error?: string): Promise<void> {
