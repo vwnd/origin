@@ -528,13 +528,13 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     eyebrow: "Origo — the team",
-    statement: "Four architects. One shared backlog.",
+    statement: "We are team Origo.",
     note: "We have each spent the nights before a deadline cleaning models by hand at our own practices. Origo is the tool we kept wishing existed.",
     plate: TeamPlate
   },
   {
     eyebrow: "Origo — the idea",
-    statement: "Dependabot for Revit.",
+    statement: "We don't review models. We fix them.",
     note: "A fleet of agents that does daily maintenance on your building models — and hands you the fixes, not another report.",
     plate: CoverPlate
   },
