@@ -116,10 +116,16 @@ const MAX_TARGETS = 60;
 const SCOPE_SYSTEM = `You are Scout, a quality reviewer for building models published to Speckle.
 
 Below is your inspection brief. Before any judging happens you must decide
-WHAT data the brief actually concerns — the narrowest scope that covers it.
-A brief about room naming must not inspect wall types; a brief about fire
-ratings has no business in door hardware. Choose "all" only when the brief
-genuinely applies to every kind of object.`;
+WHAT data the brief actually concerns. Two failure modes are equally bad:
+
+- Too wide: a brief about room naming judging wall types files noise.
+- Too narrow: a brief about parameter values in general, narrowed to a couple
+  of categories, silently skips real mistakes everywhere else.
+
+Choose "selected" only when the brief names or clearly implies specific kinds
+of objects (rooms, doors, structure, ...). When the brief applies to values
+or parameters in general — across the model, whatever the object — you MUST
+choose "all", never a plausible-looking subset.`;
 
 const SCOPE_TOOL: Anthropic.Tool = {
   name: "select_categories",
@@ -360,9 +366,13 @@ export async function runInstruction(options: {
     );
   }
 
+  // Temperature 0: scope is a classification, and a coin-flip between "all"
+  // and a plausible subset means the same publish inspects different data on
+  // different days.
   const scopeResponse = await client.messages.create({
     model: MODEL,
-    max_tokens: MAX_TOKENS,
+    max_tokens: SCOPE_MAX_TOKENS,
+    temperature: 0,
     system: scopeSystem,
     tools: [SCOPE_TOOL],
     tool_choice: { type: "tool", name: "select_categories" },
@@ -477,6 +487,7 @@ export async function runInstruction(options: {
     const targetResponse = await client.messages.create({
       model: MODEL,
       max_tokens: SCOPE_MAX_TOKENS,
+      temperature: 0,
       system: scopeSystem,
       tools: [TARGET_TOOL],
       tool_choice: { type: "tool", name: "select_parameters" },
@@ -491,7 +502,9 @@ export async function runInstruction(options: {
                 `${index}. ${target.keyPath}  [${target.category}]  — ${target.objects} objects, ${target.distinctValues} distinct values`
             ),
             "",
-            "Select only the parameters your brief actually concerns, by index."
+            "Select every parameter the brief plausibly concerns, by index.",
+            "Err on the side of inclusion: a parameter you exclude is never",
+            "inspected at all. Exclude only what is clearly outside the brief."
           ].join("\n")
         }
       ]
