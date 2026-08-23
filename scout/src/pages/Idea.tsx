@@ -8,7 +8,6 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { RuleField } from "@/components/rule-field";
 import { TextAnimate } from "@/components/ui/text-animate";
 
 /**
@@ -46,12 +45,10 @@ function usePrefersReducedMotion() {
 
 const PAPER = "rgba(235, 232, 225, 0.9)";
 const PAPER_DIM = "rgba(235, 232, 225, 0.32)";
-const INK = "rgba(22, 24, 28, 0.9)";
-
-/** Cover: the landing page's rule field, unchanged. It is the product. */
-function CoverPlate() {
-  return <RuleField className="size-full" />;
-}
+const BLUE = "#2323e6";
+/* Ink is always the defect being pointed at — the dead-end dot, the open ends
+   of the two half-loops. Never decoration, never the only stroke on blue. */
+const INK = "#16181c";
 
 const TEAM = [
   {
@@ -92,169 +89,6 @@ function TeamPlate() {
         </figure>
       ))}
     </div>
-  );
-}
-
-/**
- * Entropy: a field of ticks holding a grid, and a handful that have quietly
- * stopped holding it. The drift arrives over seconds — rot, not an explosion.
- */
-function EntropyPlate() {
-  const drifted = new Map<string, { tilt: number; at: number }>([
-    ["2-1", { tilt: 34, at: 600 }],
-    ["9-2", { tilt: -26, at: 1400 }],
-    ["5-4", { tilt: 42, at: 2200 }],
-    ["11-5", { tilt: -38, at: 3000 }],
-    ["3-6", { tilt: 24, at: 3800 }],
-    ["7-3", { tilt: -32, at: 4600 }],
-    ["12-6", { tilt: 30, at: 5400 }],
-    ["1-3", { tilt: -22, at: 6200 }]
-  ]);
-
-  return (
-    <svg viewBox="0 0 400 300" className="idea-art" aria-hidden>
-      {Array.from({ length: 8 }, (_, row) =>
-        Array.from({ length: 14 }, (_, col) => {
-          const drift = drifted.get(`${col}-${row}`);
-          const x = 31 + col * 26;
-          const y = 22 + row * 33;
-          return (
-            <line
-              key={`${col}-${row}`}
-              x1={x}
-              y1={y}
-              x2={x}
-              y2={y + 16}
-              stroke={drift ? INK : PAPER_DIM}
-              strokeWidth={drift ? 2.5 : 1.5}
-              className={drift ? "idea-tilt" : undefined}
-              style={
-                drift
-                  ? ({
-                      "--tilt": `${drift.tilt}deg`,
-                      "--d": `${drift.at}ms`
-                    } as CSSProperties)
-                  : undefined
-              }
-            />
-          );
-        })
-      )}
-    </svg>
-  );
-}
-
-/** An endless scroll of warnings, and a count with no owner attached. */
-function WarningsPlate() {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    const start = performance.now();
-    let frame = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 2400);
-      setCount(Math.round(874 * (1 - (1 - t) ** 3)));
-      if (t < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  const widths = [
-    62, 45, 71, 38, 55, 66, 42, 58, 49, 68, 36, 60, 52, 44, 64, 40, 57, 47
-  ];
-
-  return (
-    <div className="idea-warnings" aria-hidden>
-      <div className="idea-warn-scroll">
-        {[0, 1].map((copy) => (
-          <div key={copy} className="idea-warn-list">
-            {widths.map((width, i) => (
-              <div key={i} className="idea-warn-row">
-                <span className="idea-warn-index">
-                  {String(copy * widths.length + i + 1).padStart(3, "0")}
-                </span>
-                <span
-                  className="idea-warn-line"
-                  style={{ width: `${width}%` }}
-                />
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-      <p className="idea-warn-count">
-        {count.toLocaleString()} warnings · 0 owners
-      </p>
-    </div>
-  );
-}
-
-/** The morning inbox: eight rows, seven approved, one sent back. */
-function MorningPlate() {
-  const widths = [188, 152, 214, 164, 196, 142, 206, 172];
-  const rejected = 5;
-
-  return (
-    <svg viewBox="0 0 400 300" className="idea-art" aria-hidden>
-      {widths.map((width, i) => {
-        const y = 36 + i * 31;
-        const isRejected = i === rejected;
-        return (
-          <g key={i}>
-            <g className="idea-rise" style={delay(200 + i * 90)}>
-              <rect
-                x={48}
-                y={y}
-                width={12}
-                height={12}
-                fill="none"
-                stroke={PAPER}
-                strokeWidth={1.5}
-              />
-              <line
-                x1={76}
-                y1={y + 6}
-                x2={76 + width}
-                y2={y + 6}
-                stroke={PAPER_DIM}
-                strokeWidth={2}
-              />
-            </g>
-            {isRejected ? (
-              <g className="idea-pop" style={delay(1200 + i * 90)}>
-                <line
-                  x1={50.5}
-                  y1={y + 2.5}
-                  x2={57.5}
-                  y2={y + 9.5}
-                  stroke={INK}
-                  strokeWidth={2}
-                />
-                <line
-                  x1={57.5}
-                  y1={y + 2.5}
-                  x2={50.5}
-                  y2={y + 9.5}
-                  stroke={INK}
-                  strokeWidth={2}
-                />
-              </g>
-            ) : (
-              <rect
-                x={51}
-                y={y + 3}
-                width={6}
-                height={6}
-                fill={PAPER}
-                className="idea-pop"
-                style={delay(1200 + i * 90)}
-              />
-            )}
-          </g>
-        );
-      })}
-    </svg>
   );
 }
 
@@ -307,14 +141,22 @@ function TrustPlate() {
         );
       })}
       <text
-        x={356}
+        x={46}
         y={266}
-        textAnchor="end"
         className="idea-mono idea-rise"
         style={delay(1600)}
         fill={PAPER}
       >
         8 proposed · room to say no
+      </text>
+      <text
+        x={46}
+        y={288}
+        className="idea-mono idea-rise"
+        style={delay(1720)}
+        fill={PAPER_DIM}
+      >
+        two slots left empty on purpose
       </text>
     </svg>
   );
@@ -827,21 +669,1155 @@ function RecordingPlate() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Plates ported from the pitch deck.                                  */
+/*                                                                     */
+/* The deck is authored at a fixed 1920×1080 slide box read across a   */
+/* room; this page is responsive and read from 60cm. What crosses over */
+/* is composition, hierarchy and geometry — arc radii, sweep flags and */
+/* tick counts are reproduced exactly, while the type sizes stay on    */
+/* this page's own scale.                                              */
+/* ------------------------------------------------------------------ */
+
+/** Sets a bar's height as a variable, so a stacked phone layout can override
+    what an inline height would have nailed down. */
+const height = (value: string) => ({ "--h": value }) as CSSProperties;
+
+/**
+ * The mark: a ring with a deliberate 40° gap at the top — centre (50,50),
+ * r=40, running clockwise 320° from 20° to 340°. The loop that isn't closed
+ * yet, and the O of the wordmark.
+ *
+ * On paper it must be blue; on a blue plate it must be paper, because ink as
+ * a clean stroke on blue reads as a hole rather than a mark.
+ */
+function LoopMark({ size, weight }: { size: string; weight: number }) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      fill="none"
+      aria-hidden
+      className="idea-loop"
+      style={{ width: size, height: size }}
+    >
+      <path
+        d="M63.7 12.4 A 40 40 0 1 1 36.3 12.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={weight}
+        strokeLinecap="round"
+        pathLength={1}
+        className="idea-draw idea-draw-slow"
+        style={delay(200)}
+      />
+    </svg>
+  );
+}
+
+/*
+ * One chart, drawn twice. The problem slide runs it with the sawtooth as the
+ * hero; `07 — What changes` reprises the identical path data with the
+ * emphasis inverted, so the audience recognises the chart and sees only the
+ * weight move.
+ */
+const SAWTOOTH =
+  "M0 430 L250 150 L262 400 L512 110 L524 385 L774 70 L786 370 L1060 40";
+const FLAT =
+  "M0 430 C 120 424, 240 432, 360 426 C 480 420, 600 430, 720 424 C 840 418, 950 428, 1060 422";
+
+function EntropyChart({
+  hero,
+  stretch = false
+}: {
+  hero: "rot" | "flat";
+  stretch?: boolean;
+}) {
+  const rot = hero === "rot";
+  return (
+    <svg
+      viewBox="0 0 1120 480"
+      // Stretched into a band the strokes would thin with the box, so they
+      // opt out of the scale; the dots only exist on the unstretched chart.
+      preserveAspectRatio={stretch ? "none" : undefined}
+      vectorEffect={stretch ? "non-scaling-stroke" : undefined}
+      className="idea-chart-svg"
+      aria-hidden
+    >
+      <line
+        x1={0}
+        y1={440}
+        x2={1120}
+        y2={440}
+        stroke="rgba(22, 24, 28, 0.22)"
+        strokeWidth={2}
+        vectorEffect={stretch ? "non-scaling-stroke" : undefined}
+      />
+      {rot && (
+        <path
+          d={`${SAWTOOTH} L1060 440 L0 440 Z`}
+          fill={BLUE}
+          fillOpacity={0.13}
+          className="idea-rise"
+          style={delay(420)}
+        />
+      )}
+      <path
+        d={SAWTOOTH}
+        fill="none"
+        stroke={rot ? BLUE : "rgba(22, 24, 28, 0.2)"}
+        strokeWidth={rot ? 4 : 3}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect={stretch ? "non-scaling-stroke" : undefined}
+        pathLength={stretch ? undefined : 1}
+        className={stretch ? "idea-rise" : "idea-draw idea-draw-slow"}
+        style={delay(rot ? 200 : 260)}
+      />
+      <path
+        d={FLAT}
+        fill="none"
+        stroke={rot ? "rgba(22, 24, 28, 0.4)" : BLUE}
+        strokeWidth={rot ? 4 : 6}
+        strokeLinecap="round"
+        vectorEffect={stretch ? "non-scaling-stroke" : undefined}
+        pathLength={stretch ? undefined : 1}
+        className={stretch ? "idea-rise" : "idea-draw idea-draw-slow"}
+        style={delay(rot ? 780 : 420)}
+      />
+    </svg>
+  );
+}
+
+/** The three sawtooth peaks, as a share of the 1120×480 chart box. They are
+    drawn over the chart rather than in it, so stretching the box to fill a
+    plate leaves them round. */
+const PEAKS: Array<[number, number]> = [
+  [22.86, 57.29],
+  [46.25, 51.67],
+  [69.64, 45.83]
+];
+
+/**
+ * The one inverted plate in the deck: blue spikes on the sheet's own paper,
+ * because blue on blue lost the reading. Rot arrives every day; cleanup
+ * arrives three times a year, and the gap between the two curves is the cost.
+ */
+function EntropyChartPlate() {
+  return (
+    <div className="idea-chart-plate">
+      <p className="idea-label idea-rise" style={delay(200)}>
+        Issue count over one project year
+      </p>
+      <div className="idea-chart idea-chart--fill">
+        <EntropyChart hero="rot" stretch />
+        <div className="idea-chart-labels">
+          {PEAKS.map(([left, top], i) => (
+            <span
+              key={left}
+              className="idea-chart-dot idea-pop"
+              style={{
+                left: `${left}%`,
+                top: `${top}%`,
+                ...delay(1200 + i * 110)
+              }}
+            />
+          ))}
+          <span
+            className="idea-chart-tag idea-chart-tag--in idea-rise"
+            style={delay(900)}
+          >
+            entropy in, every day
+          </span>
+          <span
+            className="idea-chart-tag idea-chart-tag--p1 idea-rise"
+            style={delay(1300)}
+          >
+            crunch
+          </span>
+          <span
+            className="idea-chart-tag idea-chart-tag--p2 idea-rise"
+            style={delay(1410)}
+          >
+            crunch
+          </span>
+          <span
+            className="idea-chart-tag idea-chart-tag--p3 idea-rise"
+            style={delay(1520)}
+          >
+            permit
+          </span>
+          <span
+            className="idea-chart-tag idea-chart-tag--flat idea-rise"
+            style={delay(1100)}
+          >
+            with a daily fleet
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const FIVE_NAMES = [
+  "MEETING ROOM",
+  "Meeting Rm.",
+  "meeting room",
+  "Mtg. Room",
+  "MEETING ROOM 02"
+];
+
+/** One room, five spellings. The ink bar down the left edge is the defect
+    marker — the same device the entropy grid uses for a drifted tick. */
+function FiveNamesPlate() {
+  return (
+    <div className="idea-names">
+      <p className="idea-label idea-label--paper idea-rise" style={delay(200)}>
+        One room · five names
+      </p>
+      <div className="idea-names-grid">
+        <div className="idea-names-bar idea-rise" style={delay(280)} />
+        <div className="idea-names-list">
+          {FIVE_NAMES.map((name, i) => (
+            <p
+              key={name}
+              className="idea-name idea-rise"
+              style={delay(360 + i * 110)}
+            >
+              {name}
+            </p>
+          ))}
+        </div>
+      </div>
+      <p className="idea-names-foot idea-rise" style={delay(1000)}>
+        revit flags none of these
+      </p>
+    </div>
+  );
+}
+
+const WARNING_TEXT = [
+  "Highlighted walls overlap. One of them may be ignored…",
+  "Room Tag is outside of its Room.",
+  "Elements have duplicate 'Mark' values.",
+  "There are identical instances in the same place.",
+  "Highlighted floors overlap.",
+  "Room separation lines overlap.",
+  "Wall is slightly off axis and may cause inaccuracies.",
+  "Area is not in a properly enclosed region.",
+  "Highlighted ceilings overlap.",
+  "Curtain panels are slightly off axis.",
+  "Highlighted elements are joined but do not intersect.",
+  "Multiple Rooms are in the same enclosed region.",
+  "Line is slightly off axis and may cause inaccuracies.",
+  "Highlighted grids overlap in this view."
+];
+
+/**
+ * One warning dialog, drawn rather than screenshot.
+ *
+ * The deck tiles a Revit capture that the repo does not carry; a drawing
+ * needs no asset, scales with the sheet and stays inside the three colours.
+ * Sizes are all em-relative so one font-size per tile scales the whole thing.
+ */
+function WarningDialog({ rows }: { rows: number }) {
+  return (
+    <div className="idea-dialog">
+      <div className="idea-dialog-bar">
+        <span>Warnings</span>
+        <span>×</span>
+      </div>
+      <div className="idea-dialog-body">
+        {WARNING_TEXT.slice(0, rows).map((text) => (
+          <div key={text} className="idea-dialog-row">
+            <span className="idea-dialog-mark">!</span>
+            <span className="idea-dialog-text">{text}</span>
+          </div>
+        ))}
+      </div>
+      <div className="idea-dialog-foot">
+        <span className="idea-dialog-btn">Delete Checked</span>
+        <span className="idea-dialog-btn">OK</span>
+      </div>
+    </div>
+  );
+}
+
+/*
+ * Sixteen dialogs tiled past all four edges, at the deck's own coordinates
+ * converted off the 1920×1080 box into percentages so the wall holds its
+ * composition at any width.
+ */
+const WALL_TILES: Array<{
+  left: number;
+  top: number;
+  width: number;
+  tilt: number;
+  rows: number;
+}> = [
+  { left: -3.6, top: -5.6, width: 28.1, tilt: -3, rows: 11 },
+  { left: 19.8, top: -10.2, width: 34.4, tilt: 2, rows: 13 },
+  { left: 48.4, top: -3.7, width: 26, tilt: -2, rows: 10 },
+  { left: 67.7, top: -8.3, width: 37.5, tilt: 3, rows: 13 },
+  { left: -7.8, top: 27.8, width: 37.5, tilt: 2, rows: 12 },
+  { left: 21.9, top: 22.2, width: 28.1, tilt: -4, rows: 10 },
+  { left: 43.8, top: 33.3, width: 33.3, tilt: 1, rows: 12 },
+  { left: 70.8, top: 26.9, width: 30.2, tilt: -3, rows: 11 },
+  { left: -3.1, top: 61.9, width: 32.3, tilt: -1, rows: 12 },
+  { left: 23.4, top: 63.8, width: 37.5, tilt: 3, rows: 13 },
+  { left: 52.6, top: 59.1, width: 28.1, tilt: -2, rows: 10 },
+  { left: 74.5, top: 66.5, width: 34.4, tilt: 2, rows: 12 },
+  { left: 9.4, top: 43.5, width: 21.9, tilt: 5, rows: 9 },
+  { left: 61.5, top: 1.9, width: 19.8, tilt: -5, rows: 9 },
+  { left: 39.6, top: -12, width: 17.7, tilt: 4, rows: 9 },
+  { left: 3.1, top: 11.1, width: 15.6, tilt: -6, rows: 9 },
+  { left: -6, top: 86, width: 24.5, tilt: -2, rows: 10 },
+  { left: 14, top: 90, width: 29, tilt: 3, rows: 10 },
+  { left: 40, top: 86, width: 26, tilt: -3, rows: 10 },
+  { left: 63, top: 90, width: 31, tilt: 2, rows: 10 },
+  { left: 86, top: 84, width: 27, tilt: -2, rows: 10 }
+];
+
+/**
+ * Exhibit A — the dialog wall, run to the sheet's edge.
+ *
+ * Detection is solved, and this is what solved looks like. The wall is kept
+ * pale rather than faint: pushed much further down it stops reading as
+ * dialogs and becomes texture, which loses the joke.
+ */
+function DialogWall() {
+  return (
+    <div className="idea-wall">
+      <div className="idea-wall-tiles">
+        {WALL_TILES.map((tile, i) => (
+          <div
+            key={i}
+            className="idea-wall-tile idea-rise"
+            style={
+              {
+                left: `${tile.left}%`,
+                top: `${tile.top}%`,
+                width: `${tile.width}%`,
+                transform: `rotate(${tile.tilt}deg)`,
+                fontSize: `clamp(5px, ${(tile.width / 38).toFixed(2)}vw, 14px)`,
+                "--d": `${i * 55}ms`
+              } as CSSProperties
+            }
+          >
+            <WarningDialog rows={tile.rows} />
+          </div>
+        ))}
+      </div>
+      <div className="idea-wall-scrim" />
+      <div className="idea-wall-copy">
+        <div className="idea-wall-head">
+          <p
+            className="idea-label idea-label--paper idea-rise"
+            style={delay(0)}
+          >
+            Detection is solved
+          </p>
+        </div>
+        <div className="idea-wall-statement">
+          <h1 className="idea-rise" style={delay(200)}>
+            Nobody has ever reached the bottom of this dialog.
+          </h1>
+          <p
+            className="idea-label idea-label--paper idea-rise"
+            style={delay(420)}
+          >
+            one dialog · open on every project in this room
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The 270° both rings share: detect, then hand over a list. */
+const RING_SHARED = "M130 20 A 110 110 0 1 1 20 130";
+/** The last quarter — a dead end on one ring, a closed return on the other. */
+const RING_LAST = "M20 130 A 110 110 0 0 1 130 20";
+
+/**
+ * Two rings, open and closed. Every checker draws three quarters of the loop
+ * and stops; the same loop with the last quarter built is the whole product.
+ * Set side by side rather than stacked — the comparison is the point.
+ */
+function ThesisPlate() {
+  return (
+    <div className="idea-rings">
+      <div className="idea-ring-row">
+        <svg
+          viewBox="0 0 260 260"
+          fill="none"
+          aria-hidden
+          className="idea-ring-svg idea-rise"
+          style={delay(240)}
+        >
+          <path
+            d={RING_SHARED}
+            stroke="rgba(235, 232, 225, 0.4)"
+            strokeWidth={5}
+            strokeLinecap="round"
+            pathLength={1}
+            className="idea-draw idea-draw-slow"
+            style={delay(300)}
+          />
+          <path
+            d={RING_LAST}
+            stroke="rgba(22, 24, 28, 0.5)"
+            strokeWidth={4}
+            strokeDasharray="3 14"
+            strokeLinecap="round"
+            className="idea-rise"
+            style={delay(1100)}
+          />
+          {/* The dead end, in ink: the return that never runs. */}
+          <circle
+            cx={20}
+            cy={130}
+            r={11}
+            fill={INK}
+            className="idea-pop"
+            style={delay(1300)}
+          />
+        </svg>
+        <div className="idea-ring-caption idea-rise" style={delay(400)}>
+          <p className="idea-ring-name">EVERY CHECKER</p>
+          <p className="idea-ring-body">
+            stops at the list —<br />
+            the return never runs
+          </p>
+        </div>
+      </div>
+
+      <div className="idea-ring-row">
+        <svg
+          viewBox="0 0 260 260"
+          fill="none"
+          aria-hidden
+          className="idea-ring-svg idea-rise"
+          style={delay(520)}
+        >
+          <path
+            d={RING_SHARED}
+            stroke="rgba(235, 232, 225, 0.4)"
+            strokeWidth={5}
+            strokeLinecap="round"
+            pathLength={1}
+            className="idea-draw idea-draw-slow"
+            style={delay(580)}
+          />
+          <path
+            d={RING_LAST}
+            stroke="#ebe8e1"
+            strokeWidth={9}
+            strokeLinecap="round"
+            pathLength={1}
+            className="idea-draw"
+            style={delay(1500)}
+          />
+          <path
+            d="M121 12 L137 20 L121 28 Z"
+            fill="#ebe8e1"
+            className="idea-pop"
+            style={delay(2100)}
+          />
+        </svg>
+        <div className="idea-ring-caption idea-rise" style={delay(680)}>
+          <p className="idea-ring-name idea-ring-name--hero">ORIGO</p>
+          <p className="idea-ring-body">
+            the same loop, with
+            <br />
+            the last quarter built
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/*
+ * The morning batch: eight proposals, six approved and two sent back. The
+ * ink outlines are the same vocabulary as `MorningPlate`'s rejected row.
+ */
+const BATCH = [67.6, 54.7, 75.7, 58.1, 70.3, 50, 73, 61.5];
+const SENT_BACK = new Set([3, 6]);
+
+/** Standards accumulating: three written, the fourth still being written. */
+const BAND_RULES = ["100%", "84%", "95%", "41%"];
+
+/**
+ * Value — the composition is the argument. A and B are the surface work; C
+ * is the ground they both feed, so it bleeds edge to edge and outweighs
+ * them both rather than sitting beside them as a third equal card.
+ */
+function ValueStage() {
+  return (
+    <div className="idea-value">
+      <div className="idea-value-body">
+        <div className="idea-value-top">
+          <div className="idea-batch idea-rise" style={delay(200)}>
+            <p className="idea-label">The morning batch</p>
+            {BATCH.map((width, i) => {
+              const back = SENT_BACK.has(i);
+              return (
+                <div
+                  key={i}
+                  className="idea-batch-row idea-rise"
+                  style={delay(280 + i * 70)}
+                >
+                  <span
+                    className={
+                      back
+                        ? "idea-batch-box idea-batch-box--back"
+                        : "idea-batch-box"
+                    }
+                  >
+                    {back ? "×" : null}
+                  </span>
+                  <span
+                    className={
+                      back
+                        ? "idea-batch-rule idea-batch-rule--back"
+                        : "idea-batch-rule"
+                    }
+                    style={{ width: `${width}%` }}
+                  />
+                </div>
+              );
+            })}
+            <p className="idea-label">8 proposed · ~5 min</p>
+          </div>
+
+          <p className="idea-value-arrow idea-rise" style={delay(700)}>
+            →
+          </p>
+
+          <div className="idea-artifact-col idea-rise" style={delay(780)}>
+            <div className="idea-artifact-head">
+              <span className="idea-artifact-key">A</span>
+              <h2 className="idea-card-title">Pre-drafted fixes</h2>
+            </div>
+            <div className="idea-artifact">
+              <p className="idea-label">Element 4 829 173 · type name</p>
+              <p className="idea-data idea-artifact-strike">“Insultation”</p>
+              <p className="idea-artifact-row">
+                <span className="idea-artifact-key">→</span>
+                <span className="idea-data font-bold">“Insulation”</span>
+              </p>
+            </div>
+            <p className="idea-artifact-note">
+              Approved inside Revit, in place. Nothing to retype.
+            </p>
+          </div>
+
+          <div className="idea-artifact-col idea-rise" style={delay(900)}>
+            <div className="idea-artifact-head">
+              <span className="idea-artifact-key">B</span>
+              <h2 className="idea-card-title">Pre-done investigation</h2>
+            </div>
+            <div className="idea-artifact">
+              <p className="idea-label">Fire rating · 2 notations</p>
+              <p className="idea-artifact-row">
+                <span className="idea-data">“2 HR”</span>
+                <span className="idea-label">vs</span>
+                <span className="idea-data">“120 min”</span>
+              </p>
+              <p className="idea-artifact-row">
+                <span className="idea-artifact-key">?</span>
+                <span className="idea-label">
+                  same duration — which is house style?
+                </span>
+              </p>
+            </div>
+            <p className="idea-artifact-note">
+              Located, dissected, recommended. <b>You make the call.</b>
+            </p>
+          </div>
+        </div>
+
+        <div className="idea-value-drops idea-rise" style={delay(1050)}>
+          <div />
+          <div />
+          <p className="idea-drop">↓ every approval</p>
+          <p className="idea-drop">↓ every reason for no</p>
+        </div>
+      </div>
+
+      <div
+        className="idea-value-band idea-bleed-x idea-rise"
+        style={delay(1150)}
+      >
+        <div>
+          <p className="idea-band-label">C · the layer under both</p>
+          <h2 className="idea-band-title">Standards that write themselves</h2>
+        </div>
+        <div className="idea-band-rules">
+          {BAND_RULES.map((width, i) => (
+            <span
+              key={width}
+              className="idea-band-rule idea-write"
+              style={{ width, "--d": `${1300 + i * 130}ms` } as CSSProperties}
+            />
+          ))}
+          <p className="idea-band-label">one reason at a time</p>
+        </div>
+        <div>
+          <p className="idea-band-body">
+            An executable record of what <em>this firm</em> actually means —
+            assembled as a byproduct of the five minutes.
+          </p>
+          <p className="idea-band-label">
+            most firms’ standards live in a PDF nobody checks
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The first real run's copy column: one number doing the work. */
+function RunCopy() {
+  return (
+    <>
+      <div className="idea-run-figure idea-rise" style={delay(160)}>
+        <span className="idea-run-count">111</span>
+        <span className="idea-run-of">
+          instances
+          <br />
+          of
+        </span>
+      </div>
+      <p className="idea-run-word idea-rise" style={delay(320)}>
+        “Insultation”
+      </p>
+      <p className="idea-note idea-rise" style={delay(460)}>
+        Also <span className="font-mono">“Terrazo”</span> and a doubled inch
+        mark. All well-formed strings — Revit’s spell check never reads
+        parameter values, so none of these were ever going to surface.
+      </p>
+    </>
+  );
+}
+
+const RUN_STATS: Array<[string, string]> = [
+  ["Cost per run", "~$6 → cents"],
+  ["Review time", "~5 min / day"],
+  ["Findings, first run", "7"]
+];
+
+/** What the run cost: the index the fleet actually reads, and the bill. */
+function RunPlate() {
+  return (
+    <div className="idea-run">
+      <div>
+        <p
+          className="idea-label idea-label--paper idea-rise"
+          style={delay(200)}
+        >
+          Index size — geometry never fetched
+        </p>
+        <div className="idea-run-bars" style={{ marginTop: "0.875rem" }}>
+          <div className="idea-run-bar-row">
+            <span
+              className="idea-run-bar idea-run-bar--before idea-write"
+              style={delay(320)}
+            />
+            <span className="idea-data">863 MB</span>
+          </div>
+          <div className="idea-run-bar-row">
+            <span>
+              {/* 122.5 of 863 — the ratio is the claim, so it is drawn, not
+                  described. */}
+              <span
+                className="idea-run-bar idea-run-bar--after idea-write"
+                style={
+                  {
+                    display: "block",
+                    width: "14.2%",
+                    "--d": "520ms"
+                  } as CSSProperties
+                }
+              />
+            </span>
+            <span className="idea-data idea-run-value">122.5 MB</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="idea-run-stats">
+        {RUN_STATS.map(([label, value], i) => (
+          <div
+            key={label}
+            className="idea-run-stat idea-rise"
+            style={delay(700 + i * 120)}
+          >
+            <span>{label}</span>
+            <span className="idea-run-value">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="idea-run-foot idea-rise" style={delay(1100)}>
+        candidate selection is deterministic SQL over value-distribution shape —
+        no model decides what’s worth looking at
+      </p>
+    </div>
+  );
+}
+
+const CHANGES: Array<[string, string]> = [
+  [
+    "Hundreds of untriaged warnings, no owner",
+    "A short severity-ordered batch, daily"
+  ],
+  [
+    "Cleanup crunch before every milestone",
+    "Issue count trends toward zero, continuously"
+  ],
+  [
+    "Standards live in a PDF nobody checks",
+    "Standards are markdown the fleet enforces"
+  ],
+  ["Semantic drift invisible until export", "Caught the day it appears"],
+  [
+    "Every issue costs find + diagnose + fix",
+    "Find and diagnose are already done"
+  ]
+];
+
+/**
+ * The problem slide's chart, reprised with the weight moved: the sawtooth
+ * drops back and the flat line becomes the hero. Same path data on purpose.
+ * The legend sits beneath the chart rather than on the curves — the flat line
+ * runs low enough to strike through anything labelled near the baseline.
+ */
+function ChangeStage() {
+  return (
+    <div className="idea-change">
+      <div className="idea-chart idea-chart--band idea-rise" style={delay(200)}>
+        <EntropyChart hero="flat" stretch />
+      </div>
+      <div className="idea-legend idea-rise" style={delay(420)}>
+        <span className="idea-legend-item">
+          <span className="idea-legend-swatch" />
+          today
+        </span>
+        <span className="idea-legend-item">
+          <span className="idea-legend-swatch idea-legend-swatch--fleet" />
+          with a daily fleet
+        </span>
+      </div>
+
+      <div className="idea-change-rows">
+        <div
+          className="idea-change-row idea-change-row--head idea-rise"
+          style={delay(520)}
+        >
+          <span className="idea-change-today">Today</span>
+          <span />
+          <span className="idea-label--blue">With the fleet</span>
+        </div>
+        {CHANGES.map(([today, fleet], i) => (
+          <div
+            key={today}
+            className="idea-change-row idea-rise"
+            style={delay(600 + i * 90)}
+          >
+            <span className="idea-change-today">{today}</span>
+            <span className="idea-change-arrow">→</span>
+            <span className="idea-change-fleet">{fleet}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type Rung = {
+  tag: string;
+  status?: string;
+  title: string;
+  sub: string;
+  /** Bar height as a share of the ladder — the rungs rise left to right. */
+  h: string;
+  fill: string;
+  tagColor: string;
+  built: boolean;
+};
+
+const LADDER: Rung[] = [
+  {
+    tag: "v0",
+    status: "built · runs today",
+    title: "Parameter update CRs",
+    sub: "Misspellings, notation drift, unit coherence",
+    h: "26%",
+    fill: "#2323e6",
+    tagColor: "#ebe8e1",
+    built: true
+  },
+  {
+    tag: "v0.5",
+    title: "Same write scope",
+    sub: "Compliance triage · room naming · exceptions log",
+    h: "40%",
+    fill: "rgba(35, 35, 230, 0.42)",
+    tagColor: "#ebe8e1",
+    built: false
+  },
+  {
+    tag: "v1",
+    title: "+ element delete CRs",
+    sub: "Nomenclature · duplicate rooms · duplicate marks",
+    h: "54%",
+    fill: "#e1ded5",
+    tagColor: "#6c7077",
+    built: false
+  },
+  {
+    tag: "v1.5",
+    title: "+ geometry read, warning list",
+    sub: "Identical instances · overlaps · off-axis lines",
+    h: "70%",
+    fill: "#e1ded5",
+    tagColor: "#6c7077",
+    built: false
+  },
+  {
+    tag: "v2",
+    title: "+ geometry write",
+    sub: "Off-axis snap · simple element creation",
+    h: "88%",
+    fill: "#e1ded5",
+    tagColor: "#6c7077",
+    built: false
+  }
+];
+
+/** What gates Origo is write scope, not detection ideas — so the ladder is
+    drawn in write scope and the rungs rise as the scope widens. */
+function LadderStage() {
+  return (
+    <>
+      <div className="idea-ladder">
+        {LADDER.map((rung, i) => (
+          <div
+            key={rung.tag}
+            className={rung.built ? "idea-rung" : "idea-rung idea-rung--future"}
+          >
+            <div
+              className="idea-rung-copy idea-rise"
+              style={delay(300 + i * 110)}
+            >
+              {rung.status && <p className="idea-rung-status">{rung.status}</p>}
+              <p className="idea-rung-title">{rung.title}</p>
+              <p className="idea-rung-sub">{rung.sub}</p>
+            </div>
+            <div
+              className="idea-rung-bar idea-grow"
+              style={
+                {
+                  ...height(rung.h),
+                  backgroundColor: rung.fill,
+                  "--d": `${200 + i * 110}ms`
+                } as CSSProperties
+              }
+            >
+              <span
+                className="idea-rung-tag"
+                style={{
+                  color: rung.tagColor,
+                  fontWeight: rung.built ? 700 : 400
+                }}
+              >
+                {rung.tag}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="idea-foot-note idea-rise" style={delay(900)}>
+        Every parked rung has a written task spec in{" "}
+        <span className="idea-label--blue">fleet/tasks/</span> — the roadmap is
+        detection depth, not new plumbing.
+      </p>
+    </>
+  );
+}
+
+const INVARIANTS: Array<[string, string]> = [
+  ["Human approval is the only write path", "No autonomous writes. Ever."],
+  [
+    "No change request without a one-read rationale",
+    "If it needs a second paragraph, the fix isn’t confident enough."
+  ],
+  [
+    "A finding is never filed twice",
+    "Stable fingerprint, deduped against open issues."
+  ],
+  [
+    "The cap is a feature, not a limit",
+    "A reviewer trained to bulk-approve would kill the product."
+  ]
+];
+
+/** Four invariants as equal rows. The fourth is the one the product rests
+    on, so it takes the heavy rule and the others take a hairline. */
+function TrustCopy() {
+  return (
+    <>
+      <Statement>Nothing touches the model but you.</Statement>
+      <div className="idea-invariants">
+        {INVARIANTS.map(([title, body], i) => (
+          <div
+            key={title}
+            className={
+              i === 3
+                ? "idea-invariant idea-invariant--key idea-rise"
+                : "idea-invariant idea-rise"
+            }
+            style={delay(420 + i * 110)}
+          >
+            <span className="idea-invariant-n">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <p className="idea-invariant-t">{title}</p>
+            <p className="idea-invariant-b">{body}</p>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+const PROBLEMS: Array<[string, string]> = [
+  [
+    "Detection without resolution.",
+    "Hundreds of untriaged warnings, no owner."
+  ],
+  ["Semantic blindness.", "A regex can’t tell a convention from a violation."],
+  ["Uneconomic for humans.", "30 seconds a fix. Weeks in aggregate."]
+];
+
+/** The problem stated three ways, because one sentence reads as an opinion
+    and three numbered claims read as a diagnosis. */
+function ProblemCopy() {
+  return (
+    <>
+      <Statement>BIM rot is continuous. Cleanup is episodic.</Statement>
+      <div className="idea-points">
+        {PROBLEMS.map(([lead, rest], i) => (
+          <div
+            key={lead}
+            className="idea-point idea-rise"
+            style={delay(420 + i * 120)}
+          >
+            <span className="idea-point-n">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <p>
+              <b>{lead}</b> {rest}
+            </p>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Appendix — why now. Two arcs facing each other: the return path opening and
+ * the judgment layer arriving. Neither half is a loop on its own, and they
+ * only just met.
+ */
+function WhyNowPlate() {
+  return (
+    <div className="idea-why">
+      <div className="idea-why-art">
+        <svg
+          viewBox="0 0 600 600"
+          fill="none"
+          aria-hidden
+          className="idea-why-svg"
+        >
+          <path
+            d="M339.5 114.2 A190 190 0 0 1 339.5 485.8"
+            stroke="#ebe8e1"
+            strokeWidth={5}
+            strokeLinecap="round"
+            pathLength={1}
+            className="idea-draw idea-draw-slow"
+            style={delay(300)}
+          />
+          <path
+            d="M260.5 485.8 A190 190 0 0 1 260.5 114.2"
+            stroke="#ebe8e1"
+            strokeWidth={5}
+            strokeLinecap="round"
+            pathLength={1}
+            className="idea-draw idea-draw-slow"
+            style={delay(700)}
+          />
+          {/* The two open ends, in ink: what neither half could close alone. */}
+          <circle
+            cx={300}
+            cy={110}
+            r={9}
+            fill={INK}
+            className="idea-pop"
+            style={delay(1500)}
+          />
+          <circle
+            cx={300}
+            cy={490}
+            r={9}
+            fill={INK}
+            className="idea-pop"
+            style={delay(1600)}
+          />
+        </svg>
+        <p className="idea-why-center idea-rise" style={delay(900)}>
+          two halves
+          <br />
+          one loop
+        </p>
+        <div
+          className="idea-why-tag idea-why-tag--return idea-rise"
+          style={delay(1100)}
+        >
+          <b>RETURN PATH</b>
+          <span>
+            speckle writes
+            <br />
+            back into revit
+          </span>
+        </div>
+        <div
+          className="idea-why-tag idea-why-tag--judgment idea-rise"
+          style={delay(1200)}
+        >
+          <b>JUDGMENT</b>
+          <span>
+            the fleet decides
+            <br />
+            what a value means
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const OBJECTION: Array<[string, string, string]> = [
+  ["Trigger", "Someone remembers to export", "Webhook, on every publish"],
+  [
+    "Scope",
+    "The categories you thought to include",
+    "Every object’s writable parameters"
+  ],
+  [
+    "Knows what’s fixable",
+    "No — proposes edits Revit will refuse",
+    "Non-editable parameters are never indexed"
+  ],
+  [
+    "Output",
+    "Text you retype into the model",
+    "A change request accepted in place"
+  ]
+];
+
+/** Appendix — the obvious objection, taken head on. An LLL reading a pasted
+    schedule spots the misspelling perfectly well; that is the easy half. */
+function ObjectionStage() {
+  return (
+    <>
+      <div className="idea-objection">
+        <div
+          className="idea-objection-row idea-objection-row--head idea-rise"
+          style={delay(200)}
+        >
+          <span />
+          <span>Schedule → chat window</span>
+          <span className="idea-objection-fleet">The fleet</span>
+        </div>
+        {OBJECTION.map(([key, chat, fleet], i) => (
+          <div
+            key={key}
+            className="idea-objection-row idea-rise"
+            style={delay(280 + i * 110)}
+          >
+            <span className="idea-objection-key">{key}</span>
+            <span className="idea-objection-chat">{chat}</span>
+            <span>{fleet}</span>
+          </div>
+        ))}
+      </div>
+      <p className="idea-foot-note idea-rise" style={delay(800)}>
+        It spots “Insultation” perfectly well.{" "}
+        <span className="idea-label--blue">
+          The additionality is the pipeline and the return path — both built.
+        </span>{" "}
+        Detection depth is the roadmap.
+      </p>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* The deck.                                                           */
 /* ------------------------------------------------------------------ */
 
 type Slide = {
   eyebrow: string;
-  statement: string;
-  note: ReactNode;
-  plate: () => ReactNode;
+  /** The serif display line. On a `full` slide it sets across the stage. */
+  statement?: string;
+  /** A mono note opposite the eyebrow, `full` slides only. */
+  label?: ReactNode;
+  note?: ReactNode;
+  /** Replaces the statement + note body when a copy column needs its own
+      composition — a numbered diagnosis, one enormous number, four rows. */
+  copy?: () => ReactNode;
+  /** `spread` only: the drawing beside the copy. */
+  plate?: () => ReactNode;
+  /** `full` and `bleed` only: the composition owns the whole stage. */
+  render?: () => ReactNode;
+  layout?: "spread" | "full" | "bleed";
+  plateSurface?: "blue" | "paper";
+  /** The loop mark, set above the eyebrow in the copy column. */
+  mark?: boolean;
   cta?: boolean;
-  /** Full-bleed on the sheet's paper, no copy + plate split. */
-  full?: boolean;
 };
 
+/** The statement, animated word by word unless motion is turned down. */
+function Statement({ children }: { children: string }) {
+  const reduced = usePrefersReducedMotion();
+
+  if (reduced) return <h1 className="idea-statement">{children}</h1>;
+
+  return (
+    <TextAnimate
+      as="h1"
+      className="idea-statement"
+      animation="blurInUp"
+      by="word"
+      duration={0.6}
+      delay={0.12}
+      startOnView={false}
+      once
+    >
+      {children}
+    </TextAnimate>
+  );
+}
+
 /*
- * Every claim below is lifted from product-overview.md and cut to pitch
+ * The narrative order of the pitch deck, with the repo's own plates kept
+ * where they beat the deck's: the relay on one clock instead of the deck's
+ * architecture ring, the existing team opener, the existing close.
+ *
+ * Every claim is lifted from product-overview.md and the deck, cut to pitch
  * length. The overview argues; the deck states.
  */
 const SLIDES: Slide[] = [
@@ -849,50 +1825,71 @@ const SLIDES: Slide[] = [
     eyebrow: "Origo — the team",
     statement: "We are team Origo.",
     note: "We have seen how bad models can get, and how much time is wasted fixing them manually.",
-    plate: TeamPlate
-  },
-  {
-    eyebrow: "Origo — the idea",
-    statement: "We don't review models. We fix them.",
-    note: "A fleet of agents that does daily maintenance on your building models — and hands you the fixes, not another report.",
-    plate: CoverPlate
+    plate: TeamPlate,
+    mark: true
   },
   {
     eyebrow: "01 — The problem",
-    statement: "Models rot daily. Cleanup happens quarterly.",
-    note: "Duplicate marks, rooms named five different ways, “2 HR” next to “120 min”. None of it stops work today. All of it breaks schedules, exports and permit sets later.",
-    plate: EntropyPlate
+    copy: ProblemCopy,
+    plate: EntropyChartPlate,
+    plateSurface: "paper"
   },
   {
-    eyebrow: "02 — The gap",
-    statement: "Revit already warns. Nobody cares to fix.",
-    note: "Hundreds of untriaged warnings per project, and every checker on the market stops exactly where the work begins. Knowing is solved. Doing is not.",
-    plate: WarningsPlate
+    eyebrow: "02 — What Revit cannot see",
+    statement: "One room. Five names. No warning.",
+    note: "Every one of them is a well-formed string, so nothing is technically broken and nothing gets flagged. A rule can't tell a house convention from a violation — and this is most of what is actually wrong in a model.",
+    plate: FiveNamesPlate
   },
   {
-    eyebrow: "03 — What you get",
-    statement: "Eight fixes on your desk every morning.",
-    note: "Each one names the element, the current value, the proposed value and a one-line why. Approve most, send a few back with a reason. About five minutes.",
-    plate: MorningPlate
+    eyebrow: "Exhibit A",
+    statement: "Nobody has ever reached the bottom of this dialog.",
+    layout: "bleed",
+    render: DialogWall
   },
   {
-    eyebrow: "04 — Trust",
-    statement: "Nothing touches the model but you.",
-    note: "Human approval is the only write path, capped at ten proposals a day. The cap is a feature — a reviewer trained to bulk-approve would kill the product.",
-    plate: TrustPlate
+    eyebrow: "03 — The thesis",
+    statement: "Origo closes the loop.",
+    note: "Every checker at this hackathon detects, hands over a list, and stops exactly there. Nobody ships the last quarter — the part where the fix lands back in the model.",
+    plate: ThesisPlate
   },
   {
-    eyebrow: "05 — The architecture",
+    eyebrow: "04 — The architecture",
     statement: "Publish the model. The fleet does the rest.",
     note: "A publish lands in Speckle and wakes Origo. Scouts fan out over the version, file what they find as issues with the fixes pre-drafted, and you review them in Origo. Only what you approve flows back — the next publish comes back fixed.",
     plate: ArchitecturePlate
   },
   {
-    eyebrow: "06 — The system",
-    statement: "The loop is the product.",
-    note: "Five stations; three built, two designed — the honesty is the point.",
-    plate: SystemPlate,
-    full: true
+    eyebrow: "05 — First real run",
+    copy: RunCopy,
+    plate: RunPlate
+  },
+  {
+    eyebrow: "06 — Value",
+    statement: "Three forms of value. The third compounds.",
+    layout: "full",
+    render: ValueStage
+  },
+  {
+    eyebrow: "07 — The system",
+    label: (
+      <p className="idea-system-legend">
+        <span className="idea-system-built">● built</span>
+        <span className="idea-system-designed">○ designed</span>
+      </p>
+    ),
+    layout: "full",
+    render: SystemPlate
+  },
+  {
+    eyebrow: "08 — What changes for the customer",
+    statement: "The curve stops climbing.",
+    layout: "full",
+    render: ChangeStage
+  },
+  {
+    eyebrow: "09 — Trust",
+    copy: TrustCopy,
+    plate: TrustPlate
   },
   {
     eyebrow: "Origo",
@@ -900,6 +1897,24 @@ const SLIDES: Slide[] = [
     note: "Small, reviewable, pre-drafted, human-approved.",
     plate: ClosePlate,
     cta: true
+  },
+  {
+    eyebrow: "Appendix — Why now",
+    statement: "Two halves of the loop just met.",
+    note: "Speckle can now carry parameter updates back into Revit as change requests; without that return path, the ceiling on any checker is a report. And the judgment left over — intentional duplicate or mistake, “4 HR” or four hours — is exactly what rule engines cannot do.",
+    plate: WhyNowPlate
+  },
+  {
+    eyebrow: "Appendix — Scope ladder",
+    statement: "What Origo can write, and when.",
+    layout: "full",
+    render: LadderStage
+  },
+  {
+    eyebrow: "Appendix — The obvious objection",
+    statement: "“Just export a schedule and paste it into an LLM.”",
+    layout: "full",
+    render: ObjectionStage
   },
   {
     eyebrow: "Backup — the recording",
@@ -993,7 +2008,9 @@ export function Idea() {
   }, [go, index]);
 
   const slide = SLIDES[index]!;
+  const layout = slide.layout ?? "spread";
   const Plate = slide.plate;
+  const Render = slide.render;
 
   return (
     <div className="idea-sheet">
@@ -1009,52 +2026,60 @@ export function Idea() {
           key={index}
           className={[
             "idea-slide",
-            slide.full && "idea-slide-bare",
+            layout !== "spread" && `idea-slide--${layout}`,
             leaving && "idea-slide-leaving"
           ]
             .filter(Boolean)
             .join(" ")}
         >
-          {slide.full ? (
+          {/* `bleed` owns everything including its own chrome: the art runs
+              past where the eyebrow would sit. */}
+          {layout === "bleed" && Render && <Render />}
+
+          {layout === "full" && (
             <>
-              <div className="idea-system-head">
+              <div className="idea-full-head">
                 <p className="idea-eyebrow idea-rise" style={delay(0)}>
                   {slide.eyebrow}
                 </p>
-                <p className="idea-system-legend idea-rise" style={delay(140)}>
-                  <span className="idea-system-built">● built</span>
-                  <span className="idea-system-designed">○ designed</span>
-                </p>
+                {slide.label && (
+                  <div className="idea-rise" style={delay(80)}>
+                    {slide.label}
+                  </div>
+                )}
               </div>
-              <Plate />
+              {slide.statement && (
+                <h1 className="idea-headline idea-rise" style={delay(120)}>
+                  {slide.statement}
+                </h1>
+              )}
+              {Render && <Render />}
             </>
-          ) : (
+          )}
+
+          {layout === "spread" && (
             <>
               <div className="idea-copy">
+                {slide.mark && <LoopMark size="2.5rem" weight={6} />}
+
                 <p className="idea-eyebrow idea-rise" style={delay(0)}>
                   {slide.eyebrow}
                 </p>
 
-                {reduced ? (
-                  <h1 className="idea-statement">{slide.statement}</h1>
+                {slide.copy ? (
+                  slide.copy()
                 ) : (
-                  <TextAnimate
-                    as="h1"
-                    className="idea-statement"
-                    animation="blurInUp"
-                    by="word"
-                    duration={0.6}
-                    delay={0.12}
-                    startOnView={false}
-                    once
-                  >
-                    {slide.statement}
-                  </TextAnimate>
+                  <>
+                    {slide.statement && (
+                      <Statement>{slide.statement}</Statement>
+                    )}
+                    {slide.note && (
+                      <p className="idea-note idea-rise" style={delay(420)}>
+                        {slide.note}
+                      </p>
+                    )}
+                  </>
                 )}
-
-                <p className="idea-note idea-rise" style={delay(420)}>
-                  {slide.note}
-                </p>
 
                 {slide.cta && (
                   <div className="idea-rise" style={delay(640)}>
@@ -1066,9 +2091,20 @@ export function Idea() {
                 )}
               </div>
 
-              <div className="idea-plate idea-rise" style={delay(120)}>
-                <Plate />
-              </div>
+              {Plate && (
+                <div
+                  className={[
+                    "idea-plate",
+                    slide.plateSurface === "paper" && "idea-plate--paper",
+                    "idea-rise"
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  style={delay(120)}
+                >
+                  <Plate />
+                </div>
+              )}
             </>
           )}
         </section>
@@ -1103,7 +2139,7 @@ export function Idea() {
               type="button"
               role="tab"
               aria-selected={i === index}
-              aria-label={`Slide ${i + 1}: ${entry.statement}`}
+              aria-label={`Slide ${i + 1}: ${entry.statement ?? entry.eyebrow}`}
               className={
                 i === index ? "idea-tick idea-tick-active" : "idea-tick"
               }
