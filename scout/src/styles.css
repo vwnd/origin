@@ -1241,6 +1241,22 @@ body,
   color: var(--muted);
 }
 
+/* The fix in transit: a clockwise orbit on the ring, under the stations. */
+.idea-system-dot {
+  offset-path: path("M 0 -100 A 100 100 0 1 1 0 100 A 100 100 0 1 1 0 -100");
+  offset-rotate: 0deg;
+  animation: idea-system-orbit 9s linear infinite;
+}
+
+@keyframes idea-system-orbit {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
 .idea-system-s1 {
   left: 50%;
   bottom: calc(50% + var(--ring) / 2 + 1.25rem);
@@ -1423,6 +1439,12 @@ body,
   .idea-warn-scroll,
   .idea-pulse {
     animation: none;
+  }
+
+  /* Hold the system's fix in transit just past the top station. */
+  .idea-system-dot {
+    animation: none;
+    offset-distance: 8%;
   }
 
   /* Still the relay at a legible frame: cubes held mid-pipe, the filed log
