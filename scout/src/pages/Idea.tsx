@@ -364,13 +364,14 @@ function TrustPlate() {
 }
 
 /**
- * The architecture, with the data actually moving through it: the model
- * publishes into Speckle, Origo wakes and fans a fleet of scouts over the
- * version, findings come back as issues, and only what the designer approves
- * travels back into the model.
+ * The architecture, told as one story on one clock: a publish leaves the
+ * model, lands in Speckle, wakes Origo, fans the fleet out, the scouts work
+ * and file, the review approves, and the fix travels home — then the model
+ * blinks fixed and the next publish begins.
  *
- * The pipes are drawn once on entrance; the cubes then run on `offset-path`
- * loops — linear on purpose, a conveyor of data rather than a gesture.
+ * Every cube and every station reaction runs the same 10-second animation
+ * cycle (`.idea-arch`), each occupying its own keyframe window, so cause
+ * visibly precedes effect instead of everything flowing at once.
  */
 function ArchitecturePlate() {
   // One pipe per leg of the journey, in reading order.
@@ -387,21 +388,18 @@ function ArchitecturePlate() {
     "M151 230 L95 158" // approved fixes -> back into the model
   ];
 
-  // [pipe, travel ms, first-departure ms] — the trunk legs carry two cubes in
-  // counter-phase so the pipeline never looks empty.
-  const cubes: Array<[string, number, number]> = [
-    [pipes[0], 2200, 1500],
-    [pipes[0], 2200, 2600],
-    [pipes[1], 2000, 1800],
-    [pipes[1], 2000, 2800],
-    [pipes[2], 1600, 2100],
-    [pipes[3], 1650, 2400],
-    [pipes[4], 1700, 2700],
-    [pipes[5], 1800, 2500],
-    [pipes[6], 1700, 3000],
-    [pipes[7], 1650, 3400],
-    [pipes[8], 1900, 2200],
-    [pipes[9], 2100, 2700]
+  // Each leg is a keyframe window on the shared cycle; the fan and the
+  // convergence share theirs, so the fleet departs and reports as one.
+  const relay: Array<[string, string]> = [
+    [pipes[0], "idea-arch-leg-a"],
+    [pipes[1], "idea-arch-leg-b"],
+    [pipes[2], "idea-arch-leg-c"],
+    [pipes[3], "idea-arch-leg-c"],
+    [pipes[4], "idea-arch-leg-c"],
+    [pipes[5], "idea-arch-leg-d"],
+    [pipes[6], "idea-arch-leg-d"],
+    [pipes[7], "idea-arch-leg-d"],
+    [pipes[8], "idea-arch-leg-e"]
   ];
 
   const label = (x: number, y: number, text: string, at: number) => (
@@ -419,7 +417,7 @@ function ArchitecturePlate() {
 
   return (
     <svg viewBox="0 0 400 300" className="idea-art" aria-hidden>
-      {/* model — the designer's machine */}
+      {/* model — the designer's machine; the screen fills when the fix lands */}
       <g className="idea-rise" style={delay(200)}>
         <rect
           x={40}
@@ -446,21 +444,30 @@ function ArchitecturePlate() {
           stroke={PAPER}
           strokeWidth={1.5}
         />
+        <rect
+          x={45}
+          y={123}
+          width={38}
+          height={24}
+          fill={PAPER}
+          className="idea-arch idea-arch-fixed"
+        />
       </g>
       {label(64, 182, "model", 260)}
 
-      {/* speckle — the data platform in between */}
-      <polygon
-        points="163,46 179,62 163,78 147,62"
-        fill="none"
-        stroke={PAPER}
-        strokeWidth={1.5}
-        className="idea-rise"
-        style={delay(360)}
-      />
+      {/* speckle — blips as the publish lands */}
+      <g className="idea-rise" style={delay(360)}>
+        <polygon
+          points="163,46 179,62 163,78 147,62"
+          fill="none"
+          stroke={PAPER}
+          strokeWidth={1.5}
+          className="idea-arch idea-arch-blip"
+        />
+      </g>
       {label(163, 98, "speckle", 420)}
 
-      {/* origo — the mark, pulsing: every publish is a wake-up call */}
+      {/* origo — the mark; the ring pings when the notification arrives */}
       <g className="idea-rise" style={delay(520)}>
         <circle
           cx={272}
@@ -477,30 +484,37 @@ function ArchitecturePlate() {
         cy={62}
         r={16}
         fill="none"
-        stroke={PAPER_DIM}
+        stroke={PAPER}
         strokeWidth={1}
-        className="idea-pulse"
+        className="idea-arch idea-arch-ping"
       />
       {label(272, 98, "origo", 580)}
 
-      {/* the fleet */}
+      {/* the fleet — each scout lights up while it works the version */}
       {[112, 142, 172].map((y, i) => (
-        <rect
-          key={y}
-          x={346}
-          y={y}
-          width={12}
-          height={12}
-          fill="none"
-          stroke={PAPER}
-          strokeWidth={1.5}
-          className="idea-rise"
-          style={delay(680 + i * 90)}
-        />
+        <g key={y} className="idea-rise" style={delay(680 + i * 90)}>
+          <rect
+            x={346}
+            y={y}
+            width={12}
+            height={12}
+            fill="none"
+            stroke={PAPER}
+            strokeWidth={1.5}
+          />
+          <rect
+            x={349.5}
+            y={y + 3.5}
+            width={5}
+            height={5}
+            fill={PAPER}
+            className="idea-arch idea-arch-work"
+          />
+        </g>
       ))}
       {label(352, 208, "scouts", 860)}
 
-      {/* issues — findings with the fixes attached */}
+      {/* issues — the lines brighten as the findings are filed */}
       <g className="idea-rise" style={delay(980)}>
         <rect
           x={254}
@@ -522,10 +536,23 @@ function ArchitecturePlate() {
             strokeWidth={1.5}
           />
         ))}
+        <g className="idea-arch idea-arch-log">
+          {[230, 238, 246].map((y) => (
+            <line
+              key={y}
+              x1={260}
+              y1={y}
+              x2={284}
+              y2={y}
+              stroke={PAPER}
+              strokeWidth={1.5}
+            />
+          ))}
+        </g>
       </g>
       {label(272, 276, "issues", 1040)}
 
-      {/* review — the only write path */}
+      {/* review — the check pops when the designer approves */}
       <g className="idea-rise" style={delay(1100)}>
         <rect
           x={155}
@@ -541,6 +568,7 @@ function ArchitecturePlate() {
           fill="none"
           stroke={PAPER}
           strokeWidth={1.5}
+          className="idea-arch idea-arch-check"
         />
       </g>
       {label(163, 276, "review", 1160)}
@@ -559,8 +587,8 @@ function ArchitecturePlate() {
         />
       ))}
 
-      {/* the data itself */}
-      {cubes.map(([d, travel, departure], i) => (
+      {/* the data itself, one parcel per leg */}
+      {relay.map(([d, leg], i) => (
         <rect
           key={i}
           x={-2.75}
@@ -568,16 +596,21 @@ function ArchitecturePlate() {
           width={5.5}
           height={5.5}
           fill={PAPER}
-          className="idea-flow"
-          style={
-            {
-              "--path": `path("${d}")`,
-              "--t": `${travel}ms`,
-              "--d": `${departure}ms`
-            } as CSSProperties
-          }
+          className={`idea-cube idea-arch ${leg}`}
+          style={{ "--path": `path("${d}")` } as CSSProperties}
         />
       ))}
+
+      {/* the approved fix travels home bigger and brighter than raw data */}
+      <rect
+        x={-3.75}
+        y={-3.75}
+        width={7.5}
+        height={7.5}
+        fill="#ebe8e1"
+        className="idea-cube idea-arch idea-arch-leg-f"
+        style={{ "--path": `path("${pipes[9]}")` } as CSSProperties}
+      />
     </svg>
   );
 }

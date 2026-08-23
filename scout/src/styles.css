@@ -827,29 +827,319 @@ body,
   }
 }
 
-/* Architecture plate: data cubes travelling the pipes. Linear on purpose —
-   a conveyor of data, not a gesture. Each cube fades in as it departs and
-   out as it arrives, so the loop restart never pops. */
-.idea-flow {
+/* -- Architecture plate: one story on one clock. ---------------------------
+   Every cube and every station reaction runs the same 10s cycle; each owns a
+   keyframe window on it, so cause visibly precedes effect: publish (2–14%),
+   Speckle blips (13–17), notify (16–27), Origo pings (26–38), the fleet fans
+   out (28–38), the scouts work (39–56), findings converge (55–65), the issue
+   log brightens (63–96), the finding reaches review (67–76), the check pops
+   (76–92), the fix travels home (80–92), the model blinks fixed (93–97). */
+
+.idea-arch {
+  animation-duration: 10s;
+  animation-timing-function: linear;
+  animation-delay: 1600ms;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+.idea-cube {
   offset-path: var(--path);
   offset-rotate: 0deg;
   opacity: 0;
-  animation: idea-flow var(--t, 2000ms) linear var(--d, 0ms) infinite;
 }
 
-@keyframes idea-flow {
-  0% {
+/* Reactions rest invisible between their beats. */
+.idea-arch-ping,
+.idea-arch-work,
+.idea-arch-log,
+.idea-arch-fixed,
+.idea-arch-check {
+  opacity: 0;
+}
+
+.idea-arch-leg-a {
+  animation-name: idea-arch-leg-a;
+}
+.idea-arch-leg-b {
+  animation-name: idea-arch-leg-b;
+}
+.idea-arch-leg-c {
+  animation-name: idea-arch-leg-c;
+}
+.idea-arch-leg-d {
+  animation-name: idea-arch-leg-d;
+}
+.idea-arch-leg-e {
+  animation-name: idea-arch-leg-e;
+}
+.idea-arch-leg-f {
+  animation-name: idea-arch-leg-f;
+}
+
+/* Parcels ease in and out of each hop — handed off, not conveyed. */
+@keyframes idea-arch-leg-a {
+  0%,
+  2% {
     offset-distance: 0%;
     opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
   }
-  14% {
+  3.2% {
     opacity: 1;
   }
-  86% {
+  12.8% {
+    opacity: 1;
+  }
+  14%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-b {
+  0%,
+  16% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  17.2% {
+    opacity: 1;
+  }
+  25.8% {
+    opacity: 1;
+  }
+  27%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-c {
+  0%,
+  28% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  29.2% {
+    opacity: 1;
+  }
+  36.8% {
+    opacity: 1;
+  }
+  38%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-d {
+  0%,
+  55% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  56.2% {
+    opacity: 1;
+  }
+  63.8% {
+    opacity: 1;
+  }
+  65%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-e {
+  0%,
+  67% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  68.2% {
+    opacity: 1;
+  }
+  74.8% {
+    opacity: 1;
+  }
+  76%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-f {
+  0%,
+  80% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  81.2% {
+    opacity: 1;
+  }
+  90.8% {
+    opacity: 1;
+  }
+  92%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* Speckle acknowledges the publish. */
+.idea-arch-blip {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: idea-arch-blip;
+}
+
+@keyframes idea-arch-blip {
+  0%,
+  13% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.16);
+  }
+  17%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Origo's ring pings once, as the notification lands — and fires the fleet. */
+.idea-arch-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: idea-arch-ping;
+}
+
+@keyframes idea-arch-ping {
+  0%,
+  26% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  27.5% {
+    opacity: 0.7;
+  }
+  38%,
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* Scouts flicker while they work the version. */
+.idea-arch-work {
+  animation-name: idea-arch-work;
+}
+
+@keyframes idea-arch-work {
+  0%,
+  39% {
+    opacity: 0;
+  }
+  40.5%,
+  43% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.3;
+  }
+  47%,
+  50% {
+    opacity: 1;
+  }
+  52% {
+    opacity: 0.4;
+  }
+  54%,
+  56% {
+    opacity: 1;
+  }
+  58%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The issue log brightens when the findings are filed, and holds. */
+.idea-arch-log {
+  animation-name: idea-arch-log;
+}
+
+@keyframes idea-arch-log {
+  0%,
+  63% {
+    opacity: 0;
+  }
+  65%,
+  96% {
     opacity: 1;
   }
   100% {
-    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* The approval: a small pop with a touch of overshoot — a human said yes. */
+.idea-arch-check {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: idea-arch-check;
+}
+
+@keyframes idea-arch-check {
+  0%,
+  76% {
+    opacity: 0;
+    transform: scale(0.4);
+    animation-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  88% {
+    opacity: 1;
+  }
+  92%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* The model blinks solid as the fix lands: this cycle's publish comes back
+   fixed, and the next one begins. */
+.idea-arch-fixed {
+  animation-name: idea-arch-fixed;
+}
+
+@keyframes idea-arch-fixed {
+  0%,
+  91.5% {
+    opacity: 0;
+  }
+  93%,
+  96.5% {
+    opacity: 0.9;
+  }
+  98.5%,
+  100% {
     opacity: 0;
   }
 }
@@ -982,11 +1272,22 @@ body,
     animation: none;
   }
 
-  /* Hold each cube mid-pipe: the still frame keeps the flow legible. */
-  .idea-flow {
+  /* Still the relay at a legible frame: cubes held mid-pipe, the filed log
+     and the approval shown, the transient blinks hidden. */
+  .idea-arch {
     animation: none;
+  }
+
+  .idea-cube {
     offset-distance: 55%;
     opacity: 1;
+  }
+
+  .idea-arch-work,
+  .idea-arch-log,
+  .idea-arch-check {
+    opacity: 1;
+    transform: none;
   }
 
   .idea-arrow,
