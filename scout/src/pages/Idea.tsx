@@ -4,7 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode
+  type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -27,7 +27,7 @@ function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(
     () =>
       typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
 
   useEffect(() => {
@@ -57,15 +57,15 @@ const TEAM = [
   {
     name: "Victor Barbosa",
     firm: "Schmidt Hammer Lassen",
-    src: "/victor-barbosa.jpg"
+    src: "/victor-barbosa.jpg",
   },
   {
     name: "Qianyi Huang",
     firm: "Throughline Studio",
-    src: "/qianyi-huang.jpg"
+    src: "/qianyi-huang.jpg",
   },
   { name: "Jack Walker", firm: "Prospect Studio", src: "/jack-walker.jpg" },
-  { name: "Mike Daley", firm: "Perkins&Will", src: "/mike-daley.png" }
+  { name: "Mike Daley", firm: "Perkins&Will", src: "/mike-daley.png" },
 ];
 
 /** The team, printed in the sheet's own ink: blue-toned portraits on the plate. */
@@ -108,7 +108,7 @@ function EntropyPlate() {
     ["3-6", { tilt: 24, at: 3800 }],
     ["7-3", { tilt: -32, at: 4600 }],
     ["12-6", { tilt: 30, at: 5400 }],
-    ["1-3", { tilt: -22, at: 6200 }]
+    ["1-3", { tilt: -22, at: 6200 }],
   ]);
 
   return (
@@ -132,13 +132,13 @@ function EntropyPlate() {
                 drift
                   ? ({
                       "--tilt": `${drift.tilt}deg`,
-                      "--d": `${drift.at}ms`
+                      "--d": `${drift.at}ms`,
                     } as CSSProperties)
                   : undefined
               }
             />
           );
-        })
+        }),
       )}
     </svg>
   );
@@ -161,7 +161,7 @@ function WarningsPlate() {
   }, []);
 
   const widths = [
-    62, 45, 71, 38, 55, 66, 42, 58, 49, 68, 36, 60, 52, 44, 64, 40, 57, 47
+    62, 45, 71, 38, 55, 66, 42, 58, 49, 68, 36, 60, 52, 44, 64, 40, 57, 47,
   ];
 
   return (
@@ -252,7 +252,7 @@ function LoopPlate() {
     ["judge", 337, 122],
     ["draft", 288, 268],
     ["deliver", 112, 268],
-    ["approve", 63, 122]
+    ["approve", 63, 122],
   ];
 
   return (
@@ -529,64 +529,64 @@ const SLIDES: Slide[] = [
   {
     eyebrow: "Origo — the team",
     statement: "We are team Origo.",
-    note: "We have each spent the nights before a deadline cleaning models by hand at our own practices. Origo is the tool we kept wishing existed.",
-    plate: TeamPlate
+    note: "We have seen how bad models can get, and how much time is wasted fixing them manually.",
+    plate: TeamPlate,
   },
   {
     eyebrow: "Origo — the idea",
     statement: "We don't review models. We fix them.",
     note: "A fleet of agents that does daily maintenance on your building models — and hands you the fixes, not another report.",
-    plate: CoverPlate
+    plate: CoverPlate,
   },
   {
     eyebrow: "01 — The problem",
     statement: "Models rot daily. Cleanup happens quarterly.",
     note: "Duplicate marks, rooms named five different ways, “2 HR” next to “120 min”. None of it stops work today. All of it breaks schedules, exports and permit sets later.",
-    plate: EntropyPlate
+    plate: EntropyPlate,
   },
   {
     eyebrow: "02 — The gap",
     statement: "Revit already warns. Nobody owns the list.",
     note: "Hundreds of untriaged warnings per project, and every checker on the market stops exactly where the work begins. Knowing is solved. Doing is not.",
-    plate: WarningsPlate
+    plate: WarningsPlate,
   },
   {
     eyebrow: "03 — Why rules can't fix it",
     statement: "Four strings. One fire rating.",
     note: "Rule engines compare text, so “4 HR”, “4hr”, “240 min” and “4 hours” are four different values. Telling a convention from a violation takes judgment — and judgment just became automatable.",
-    plate: JudgePlate
+    plate: JudgePlate,
   },
   {
     eyebrow: "04 — Why now",
     statement: "The loop finally closes.",
     note: "Agents make the call. Speckle delivers the fix into Revit as a change request you accept with a click. Rejections flow back and teach the fleet.",
-    plate: LoopPlate
+    plate: LoopPlate,
   },
   {
     eyebrow: "05 — What you get",
     statement: "Eight fixes on your desk every morning.",
     note: "Each one names the element, the current value, the proposed value and a one-line why. Approve most, send a few back with a reason. About five minutes.",
-    plate: MorningPlate
+    plate: MorningPlate,
   },
   {
     eyebrow: "06 — Trust",
     statement: "Nothing touches the model but you.",
     note: "Human approval is the only write path, capped at ten proposals a day. The cap is a feature — a reviewer trained to bulk-approve would kill the product.",
-    plate: TrustPlate
+    plate: TrustPlate,
   },
   {
     eyebrow: "07 — The compounding part",
     statement: "Using it writes your standards down.",
     note: "Every rejection becomes a durable exception; three of a kind revise the convention itself. The fleet gets better at your firm, not at models in general.",
-    plate: CompoundPlate
+    plate: CompoundPlate,
   },
   {
     eyebrow: "Origo",
     statement: "Daily maintenance. Not cleanup sprints.",
     note: "Small, reviewable, pre-drafted, human-approved.",
     plate: ClosePlate,
-    cta: true
-  }
+    cta: true,
+  },
 ];
 
 /** Exit is shorter than entrance — nobody needs to watch a slide leave. */
@@ -630,7 +630,7 @@ export function Idea() {
         setLeaving(false);
       }, EXIT);
     },
-    [index, leaving, reduced]
+    [index, leaving, reduced],
   );
 
   useEffect(() => {
