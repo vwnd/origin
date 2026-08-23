@@ -630,6 +630,7 @@ const SYSTEM_STATIONS: SystemStation[] = [
 const SYSTEM_R = 100;
 
 function SystemPlate() {
+  const reduced = usePrefersReducedMotion();
   const point = (angle: number, radius: number) => {
     const rad = (angle * Math.PI) / 180;
     return { x: Math.cos(rad) * radius, y: -Math.sin(rad) * radius };
@@ -700,9 +701,20 @@ function SystemPlate() {
             })
           )}
           {/* The loop, alive: a fix in transit, orbiting clockwise under the
-              stations. Inherited from the retired "Why now" plate — the same
-              dot, now travelling the system that carries it. */}
-          <g className="idea-orbit">
+              stations. SMIL rather than a CSS transform — the ring's centre
+              is the user-space origin, which animateTransform rotates about
+              natively. Reduced motion holds it a little past the top. */}
+          <g transform="rotate(30)">
+            {!reduced && (
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="30"
+                to="390"
+                dur="9s"
+                repeatCount="indefinite"
+              />
+            )}
             <circle cx={0} cy={-SYSTEM_R} r={4.5} fill="var(--blue)" />
           </g>
           {SYSTEM_STATIONS.map((station, i) => {
