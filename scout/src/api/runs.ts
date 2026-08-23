@@ -164,3 +164,131 @@ export async function listRuns(env: Env, limit = 50): Promise<RunRecord[]> {
     .all();
   return (results ?? []).map((row) => toRecord(row as Record<string, unknown>));
 }
+
+/**
+ * Per-scout progress within one run.
+ *
+ * The fleet runs in parallel, so the run row alone cannot say which scout is
+ * still judging and which already filed — these rows can. Status walks
+ * inspecting -> filing -> complete | no_findings | skipped | failed.
+ */
+export type ScoutRunRecord = {
+  instanceId: string;
+  scoutId: string;
+  scoutTitle: string;
+  status: string;
+  findings: number | null;
+  deltas: number | null;
+  costUsd: number | null;
+  issueIdentifier: string | null;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+};
+
+function toScoutRecord(row: Record<string, unknown>): ScoutRunRecord {
+  const num = (value: unknown) => (value === null ? null : Number(value));
+  const str = (value: unknown) => (value === null ? null : String(value));
+  return {
+    instanceId: String(row.instance_id),
+    scoutId: String(row.scout_id),
+    scoutTitle: String(row.scout_title),
+    status: String(row.status),
+    findings: num(row.findings),
+    deltas: num(row.deltas),
+    costUsd: num(row.cost_usd),
+    issueIdentifier: str(row.issue_identifier),
+    error: str(row.error),
+    startedAt: String(row.started_at),
+    finishedAt: str(row.finished_at)
+  };
+}
+
+/**
+ * Idempotent start marker. DO NOTHING on conflict: a workflow engine re-run
+ * replays this call after the scout has already finished, and must not drag
+ * a terminal row back to "inspecting".
+ */
+export async function recordScoutRunStarted(
+  env: Env,
+  input: { instanceId: string; scoutId: string; scoutTitle: string }
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO scout_runs (instance_id, scout_id, scout_title, status, started_at)
+     VALUES (?, ?, ?, 'inspecting', ?)
+     ON CONFLICT(instance_id, scout_id) DO NOTHING`
+  )
+    .bind(
+      input.instanceId,
+      input.scoutId,
+      input.scoutTitle,
+      new Date().toISOString()
+    )
+    .run();
+}
+
+/** Merge in whatever the scout has learned so far, `updateRun`-style. */
+export async function updateScoutRun(
+  env: Env,
+  instanceId: string,
+  scoutId: string,
+  patch: Partial<{
+    status: string;
+    findings: number;
+    deltas: number;
+    costUsd: number;
+    issueIdentifier: string | null;
+    error: string | null;
+    finished: boolean;
+  }>
+): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE scout_runs SET
+       status = COALESCE(?, status),
+       findings = COALESCE(?, findings),
+       deltas = COALESCE(?, deltas),
+       cost_usd = COALESCE(?, cost_usd),
+       issue_identifier = COALESCE(?, issue_identifier),
+       error = COALESCE(?, error),
+       finished_at = COALESCE(?, finished_at)
+     WHERE instance_id = ? AND scout_id = ?`
+  )
+    .bind(
+      patch.status ?? null,
+      patch.findings ?? null,
+      patch.deltas ?? null,
+      patch.costUsd ?? null,
+      patch.issueIdentifier ?? null,
+      patch.error ?? null,
+      patch.finished ? new Date().toISOString() : null,
+      instanceId,
+      scoutId
+    )
+    .run();
+}
+
+/** Scout rows for a set of runs, grouped by instance for the API to attach. */
+export async function listScoutRuns(
+  env: Env,
+  instanceIds: string[]
+): Promise<Map<string, ScoutRunRecord[]>> {
+  const grouped = new Map<string, ScoutRunRecord[]>();
+  if (instanceIds.length === 0) return grouped;
+
+  const placeholders = instanceIds.map(() => "?").join(", ");
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM scout_runs
+     WHERE instance_id IN (${placeholders})
+     ORDER BY started_at ASC`
+  )
+    .bind(...instanceIds)
+    .all();
+
+  for (const row of results ?? []) {
+    const record = toScoutRecord(row as Record<string, unknown>);
+    const bucket = grouped.get(record.instanceId) ?? [];
+    bucket.push(record);
+    grouped.set(record.instanceId, bucket);
+  }
+  return grouped;
+}

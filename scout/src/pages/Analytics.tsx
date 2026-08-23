@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Activity, CheckCircle2, CircleAlert, Loader2 } from "lucide-react";
-import { api, type RunRecord } from "@/lib/api";
+import { api, type RunRecord, type ScoutRunRecord } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +18,9 @@ import { EmptyState } from "@/components/empty-state";
 const ACTIVE_POLL_MS = 3000;
 const IDLE_POLL_MS = 20000;
 
-const RUNNING_STATUSES = new Set(["running", "inspecting"]);
+// "filing" is a scout-row status: the scout found something and is writing
+// the issue and its deltas.
+const RUNNING_STATUSES = new Set(["running", "inspecting", "filing"]);
 
 function statusBadge(status: string) {
   if (RUNNING_STATUSES.has(status)) {
@@ -38,6 +40,7 @@ function statusBadge(status: string) {
     );
   }
   if (status === "no_findings") return <Badge variant="secondary">clean</Badge>;
+  if (status === "skipped") return <Badge variant="secondary">skipped</Badge>;
   return (
     <Badge variant="destructive" className="gap-1">
       <CircleAlert className="size-3" />
@@ -46,14 +49,48 @@ function statusBadge(status: string) {
   );
 }
 
-function duration(run: RunRecord): string {
-  const end = run.finishedAt ? new Date(run.finishedAt) : new Date();
+function duration(span: { startedAt: string; finishedAt: string | null }) {
+  const end = span.finishedAt ? new Date(span.finishedAt) : new Date();
   const seconds = Math.max(
     0,
-    Math.round((end.getTime() - new Date(run.startedAt).getTime()) / 1000)
+    Math.round((end.getTime() - new Date(span.startedAt).getTime()) / 1000)
   );
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+/** One fleet member's row, indented under its run. */
+function ScoutRow({ scout }: { scout: ScoutRunRecord }) {
+  return (
+    <TableRow className="bg-muted/40">
+      <TableCell className="py-2">{statusBadge(scout.status)}</TableCell>
+      <TableCell
+        className="max-w-[220px] truncate py-2 pl-8 text-sm text-muted-foreground"
+        colSpan={3}
+        title={scout.error ?? undefined}
+      >
+        {scout.scoutTitle}
+        {scout.error ? (
+          <span className="ml-2 text-xs text-destructive">
+            {scout.error.slice(0, 60)}
+          </span>
+        ) : null}
+      </TableCell>
+      <TableCell className="py-2 tabular-nums">
+        {scout.findings ?? "—"}
+      </TableCell>
+      <TableCell className="py-2 tabular-nums">{scout.deltas ?? "—"}</TableCell>
+      <TableCell className="py-2 font-mono text-xs">
+        {scout.issueIdentifier ?? "—"}
+      </TableCell>
+      <TableCell className="py-2 tabular-nums">
+        {scout.costUsd ? `$${scout.costUsd.toFixed(2)}` : "—"}
+      </TableCell>
+      <TableCell className="py-2 tabular-nums text-muted-foreground">
+        {duration(scout)}
+      </TableCell>
+    </TableRow>
+  );
 }
 
 export function Analytics({ refreshKey }: { refreshKey: number }) {
@@ -161,41 +198,46 @@ export function Analytics({ refreshKey }: { refreshKey: number }) {
             </TableHeader>
             <TableBody>
               {runs.map((run) => (
-                <TableRow key={run.instanceId}>
-                  <TableCell>{statusBadge(run.status)}</TableCell>
-                  <TableCell
-                    className="max-w-[220px] truncate font-medium"
-                    title={run.error ?? undefined}
-                  >
-                    {run.modelName ?? "—"}
-                    {run.error ? (
-                      <span className="ml-2 text-xs text-destructive">
-                        {run.error.slice(0, 60)}
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {run.versionId}
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    {run.indexedObjects?.toLocaleString() ?? "—"}
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    {run.findings ?? "—"}
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    {run.deltas ?? "—"}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {run.issueIdentifier ?? "—"}
-                  </TableCell>
-                  <TableCell className="tabular-nums">
-                    {run.costUsd ? `$${run.costUsd.toFixed(2)}` : "—"}
-                  </TableCell>
-                  <TableCell className="tabular-nums text-muted-foreground">
-                    {duration(run)}
-                  </TableCell>
-                </TableRow>
+                <Fragment key={run.instanceId}>
+                  <TableRow>
+                    <TableCell>{statusBadge(run.status)}</TableCell>
+                    <TableCell
+                      className="max-w-[220px] truncate font-medium"
+                      title={run.error ?? undefined}
+                    >
+                      {run.modelName ?? "—"}
+                      {run.error ? (
+                        <span className="ml-2 text-xs text-destructive">
+                          {run.error.slice(0, 60)}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {run.versionId}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {run.indexedObjects?.toLocaleString() ?? "—"}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {run.findings ?? "—"}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {run.deltas ?? "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {run.issueIdentifier ?? "—"}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {run.costUsd ? `$${run.costUsd.toFixed(2)}` : "—"}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {duration(run)}
+                    </TableCell>
+                  </TableRow>
+                  {run.scouts.map((scout) => (
+                    <ScoutRow key={scout.scoutId} scout={scout} />
+                  ))}
+                </Fragment>
               ))}
             </TableBody>
           </Table>

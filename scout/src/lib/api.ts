@@ -21,6 +21,21 @@ export type Issue = {
   author: { user: { name: string | null } | null } | null;
 };
 
+/** One scout's progress within a run: inspecting -> filing -> terminal. */
+export type ScoutRunRecord = {
+  instanceId: string;
+  scoutId: string;
+  scoutTitle: string;
+  status: string;
+  findings: number | null;
+  deltas: number | null;
+  costUsd: number | null;
+  issueIdentifier: string | null;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+};
+
 export type RunRecord = {
   instanceId: string;
   projectId: string;
@@ -35,6 +50,8 @@ export type RunRecord = {
   costUsd: number | null;
   issueIdentifier: string | null;
   error: string | null;
+  /** The fleet, one row per scout, live while the run is in flight. */
+  scouts: ScoutRunRecord[];
 };
 
 const TOKEN_KEY = "origo.adminToken";

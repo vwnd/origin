@@ -3,7 +3,7 @@ import { listProjectIssues, getWorkspaceId } from "../speckle/client";
 import { SPECKLE_PROJECT_ID } from "../speckle/config";
 import { createLogger, errorMessage } from "../speckle/logging";
 import { timingSafeEqualStrings } from "../speckle/signature";
-import { listRuns } from "./runs";
+import { listRuns, listScoutRuns } from "./runs";
 
 /**
  * JSON API behind the UI.
@@ -125,8 +125,21 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
 
     // ---- workflow runs ------------------------------------------------
     if (route === "runs") {
+      const runs = await listRuns(
+        env,
+        Number(url.searchParams.get("limit") ?? 50)
+      );
+      // The fleet runs in parallel, so each run carries its per-scout rows —
+      // that is where "which scout is still judging?" is answered.
+      const scouts = await listScoutRuns(
+        env,
+        runs.map((run) => run.instanceId)
+      );
       return json({
-        runs: await listRuns(env, Number(url.searchParams.get("limit") ?? 50))
+        runs: runs.map((run) => ({
+          ...run,
+          scouts: scouts.get(run.instanceId) ?? []
+        }))
       });
     }
 
