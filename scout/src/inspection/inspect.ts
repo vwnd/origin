@@ -255,7 +255,10 @@ export async function runInstruction(options: {
   let judged = 0;
   let failed = 0;
   let firstError: string | null = null;
-  let stoppedBecause: InspectionResult["stoppedBecause"] = "completed";
+  // The cast keeps the union: this is assigned from inside the worker
+  // closures, which TypeScript's narrowing cannot see — without it the
+  // "cost_cap" comparison below is (wrongly) flagged as impossible.
+  let stoppedBecause = "completed" as InspectionResult["stoppedBecause"];
 
   // Byte-identical for every request, so it becomes the cached prefix and is
   // read at a fraction of its cost after the first call.

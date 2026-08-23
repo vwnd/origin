@@ -183,7 +183,7 @@ export async function loadEnabledScouts(env: Env): Promise<Instruction[]> {
   const metas = (await listScouts(env)).filter((meta) => meta.enabled);
 
   const loaded = await Promise.all(
-    metas.map(async (meta) => {
+    metas.map(async (meta): Promise<Instruction | null> => {
       const object = await env.INSTRUCTIONS.get(bodyKey(meta.id));
       const body = object ? await object.text() : "";
       if (!body.trim()) return null;
