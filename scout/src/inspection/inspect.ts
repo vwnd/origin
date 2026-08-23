@@ -366,13 +366,9 @@ export async function runInstruction(options: {
     );
   }
 
-  // Temperature 0: scope is a classification, and a coin-flip between "all"
-  // and a plausible subset means the same publish inspects different data on
-  // different days.
   const scopeResponse = await client.messages.create({
     model: MODEL,
     max_tokens: SCOPE_MAX_TOKENS,
-    temperature: 0,
     system: scopeSystem,
     tools: [SCOPE_TOOL],
     tool_choice: { type: "tool", name: "select_categories" },
@@ -487,7 +483,6 @@ export async function runInstruction(options: {
     const targetResponse = await client.messages.create({
       model: MODEL,
       max_tokens: SCOPE_MAX_TOKENS,
-      temperature: 0,
       system: scopeSystem,
       tools: [TARGET_TOOL],
       tool_choice: { type: "tool", name: "select_parameters" },
