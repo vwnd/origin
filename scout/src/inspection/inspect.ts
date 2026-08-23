@@ -84,6 +84,9 @@ export type InspectionResult = {
   stoppedBecause: "completed" | "cost_cap" | "failed";
   /** First error seen, so a systemic failure is visible rather than inferred. */
   error: string | null;
+  /** What the scout scoped itself to, for the run record — or why it had
+   *  nothing to inspect. */
+  scopeNote: string | null;
   usage: Usage;
 };
 
@@ -142,20 +145,24 @@ const SCOPE_TOOL: Anthropic.Tool = {
   }
 };
 
+/** Generous ceiling for the scoping calls — their outputs are index lists
+ *  and category names, never prose, so this is headroom, not budget. */
+const SCOPE_MAX_TOKENS = 2048;
+
 const TARGET_TOOL: Anthropic.Tool = {
   name: "select_parameters",
-  description: "Select the parameters your brief should inspect.",
+  description: "Select the parameters your brief should inspect, by index.",
   input_schema: {
     type: "object",
     properties: {
-      keyPaths: {
+      indexes: {
         type: "array",
-        items: { type: "string" },
+        items: { type: "integer" },
         description:
-          "keyPath strings copied verbatim from the list shown. Empty when none are relevant to the brief."
+          "Index numbers from the numbered list shown. Empty when none of the listed parameters are relevant to the brief."
       }
     },
-    required: ["keyPaths"],
+    required: ["indexes"],
     additionalProperties: false
   }
 };
@@ -319,8 +326,9 @@ export async function runInstruction(options: {
   let stoppedBecause = "completed" as InspectionResult["stoppedBecause"];
 
   /** An honest early exit: the scout looked, and its brief scopes to nothing
-   *  in this model — which is a clean outcome, not a failure. */
-  const nothingInScope = (): InspectionResult => ({
+   *  in this model — a clean outcome, not a failure. The note says why, so a
+   *  quiet run is legible instead of indistinguishable from a clean model. */
+  const nothingInScope = (note: string): InspectionResult => ({
     instructionId: instruction.id,
     findings: [],
     candidates: 0,
@@ -328,6 +336,7 @@ export async function runInstruction(options: {
     failed: 0,
     stoppedBecause: "completed",
     error: null,
+    scopeNote: note,
     usage: { ...usage, estimatedCostUsd: estimateCost(usage) }
   });
 
@@ -392,7 +401,13 @@ export async function runInstruction(options: {
     logger.info("scope_no_categories", {
       requested: scopeInput.categories ?? []
     });
-    return nothingInScope();
+    return nothingInScope(
+      `brief scopes to categories not present in this model (asked for ${(
+        scopeInput.categories ?? []
+      )
+        .filter((item): item is string => typeof item === "string")
+        .join(", ")})`
+    );
   }
 
   // ---- Scope stage 2: which parameters within that scope? ---------------
@@ -440,45 +455,72 @@ export async function runInstruction(options: {
 
   if (inventory.length === 0) {
     logger.info("scope_no_parameters", { categories: scopedCategories });
-    return nothingInScope();
+    return nothingInScope(
+      `no text parameters found in scoped categories (${scopedCategories.join(", ")})`
+    );
   }
 
-  const targetResponse = await client.messages.create({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    system: scopeSystem,
-    tools: [TARGET_TOOL],
-    tool_choice: { type: "tool", name: "select_parameters" },
-    messages: [
-      {
-        role: "user",
-        content: [
-          scopedCategories.length > 0
-            ? `Parameters carried by the categories in scope (${scopedCategories.join(", ")}):`
-            : "Candidate parameters across the whole model:",
-          "",
-          ...inventory.map(
-            (target) =>
-              `${target.keyPath}${target.category ? `  [${target.category}]` : ""}  — ${target.objects} objects, ${target.distinctValues} distinct values`
-          ),
-          "",
-          "Select only the parameters your brief actually concerns, by exact keyPath."
-        ].join("\n")
-      }
-    ]
-  });
-  takeUsage(targetResponse);
+  let targets: Target[];
+  let scopeNote: string;
 
-  const targetInput = toolInputOf(targetResponse) as { keyPaths?: unknown[] };
-  const wanted = new Set(
-    (targetInput.keyPaths ?? []).filter(
-      (item): item is string => typeof item === "string"
-    )
-  );
+  if (scopedCategories.length === 0) {
+    // A genuinely global brief concerns every candidate the heuristic
+    // offers — paying a model to re-select all of them adds cost and a
+    // truncation hazard for zero information.
+    targets = inventory;
+    scopeNote = `scope: all categories — ${targets.length} parameters`;
+  } else {
+    // Selection by index, not by copying keyPaths: keyPaths are long, and a
+    // response that has to echo dozens of them can hit its output ceiling
+    // mid-JSON — which parses as "nothing selected" and silently reports a
+    // clean model. An index list cannot meaningfully truncate.
+    const targetResponse = await client.messages.create({
+      model: MODEL,
+      max_tokens: SCOPE_MAX_TOKENS,
+      system: scopeSystem,
+      tools: [TARGET_TOOL],
+      tool_choice: { type: "tool", name: "select_parameters" },
+      messages: [
+        {
+          role: "user",
+          content: [
+            `Parameters carried by the categories in scope (${scopedCategories.join(", ")}):`,
+            "",
+            ...inventory.map(
+              (target, index) =>
+                `${index}. ${target.keyPath}  [${target.category}]  — ${target.objects} objects, ${target.distinctValues} distinct values`
+            ),
+            "",
+            "Select only the parameters your brief actually concerns, by index."
+          ].join("\n")
+        }
+      ]
+    });
+    takeUsage(targetResponse);
 
-  let targets = inventory.filter((target) => wanted.has(target.keyPath));
+    if (targetResponse.stop_reason === "max_tokens") {
+      // Should be impossible with an index list; if it happens anyway, judge
+      // the whole scoped inventory loudly rather than pass clean silently.
+      logger.warn("scope_selection_truncated", {
+        offered: inventory.length
+      });
+      targets = inventory;
+    } else {
+      const targetInput = toolInputOf(targetResponse) as {
+        indexes?: unknown[];
+      };
+      const wanted = new Set(
+        (targetInput.indexes ?? [])
+          .filter((item): item is number => Number.isInteger(item))
+          .filter((item) => item >= 0 && item < inventory.length)
+      );
+      targets = inventory.filter((_, index) => wanted.has(index));
+    }
+    scopeNote = `scope: ${scopedCategories.join(", ")} — ${targets.length} of ${inventory.length} parameters`;
+  }
+
   if (options.maxCandidates) targets = targets.slice(0, options.maxCandidates);
-  targets = targets.slice(0, MAX_TARGETS);
+  if (scopedCategories.length > 0) targets = targets.slice(0, MAX_TARGETS);
 
   logger.info("scope_selected", {
     categories: scopedCategories,
@@ -488,7 +530,9 @@ export async function runInstruction(options: {
   });
 
   if (targets.length === 0) {
-    return nothingInScope();
+    return nothingInScope(
+      `brief selected no parameters within ${scopedCategories.join(", ")}`
+    );
   }
 
   // Byte-identical for every judge request, so it becomes the cached prefix
@@ -694,6 +738,7 @@ export async function runInstruction(options: {
     failed,
     stoppedBecause,
     error: firstError,
+    scopeNote,
     usage: { ...usage, estimatedCostUsd }
   };
 }

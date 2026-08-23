@@ -261,6 +261,7 @@ export async function runInspect(url: URL, env: Env): Promise<Response> {
         failed: result.failed,
         stoppedBecause: result.stoppedBecause,
         error: result.error,
+        scopeNote: result.scopeNote,
         findings: result.findings.length,
         usage: result.usage
       })),

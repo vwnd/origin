@@ -480,7 +480,8 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
           // Collapse the same problem seen through denormalized parameters.
           return {
             findings: collapseDuplicates(result.findings),
-            estimatedCostUsd: result.usage.estimatedCostUsd
+            estimatedCostUsd: result.usage.estimatedCostUsd,
+            scopeNote: result.scopeNote
           };
         }
       );
@@ -491,6 +492,14 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
           finished: true
         });
         return null;
+      }
+
+      // Surface what the scout scoped itself to as soon as it is known, so
+      // "no findings" is legible as either "clean" or "nothing in scope".
+      if (inspected.scopeNote) {
+        await updateScoutRun(this.env, event.instanceId, scout.id, {
+          note: inspected.scopeNote
+        });
       }
 
       // Dedupe against what is already open on the project, so republishing

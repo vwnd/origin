@@ -32,6 +32,8 @@ export type ScoutRunRecord = {
   costUsd: number | null;
   issueIdentifier: string | null;
   error: string | null;
+  /** What the scout scoped itself to, or why it had nothing to inspect. */
+  note: string | null;
   startedAt: string;
   finishedAt: string | null;
 };

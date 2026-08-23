@@ -182,6 +182,8 @@ export type ScoutRunRecord = {
   costUsd: number | null;
   issueIdentifier: string | null;
   error: string | null;
+  /** What the scout scoped itself to, or why it had nothing to inspect. */
+  note: string | null;
   startedAt: string;
   finishedAt: string | null;
 };
@@ -199,6 +201,7 @@ function toScoutRecord(row: Record<string, unknown>): ScoutRunRecord {
     costUsd: num(row.cost_usd),
     issueIdentifier: str(row.issue_identifier),
     error: str(row.error),
+    note: str(row.note),
     startedAt: String(row.started_at),
     finishedAt: str(row.finished_at)
   };
@@ -239,6 +242,7 @@ export async function updateScoutRun(
     costUsd: number;
     issueIdentifier: string | null;
     error: string | null;
+    note: string | null;
     finished: boolean;
   }>
 ): Promise<void> {
@@ -250,6 +254,7 @@ export async function updateScoutRun(
        cost_usd = COALESCE(?, cost_usd),
        issue_identifier = COALESCE(?, issue_identifier),
        error = COALESCE(?, error),
+       note = COALESCE(?, note),
        finished_at = COALESCE(?, finished_at)
      WHERE instance_id = ? AND scout_id = ?`
   )
@@ -260,6 +265,7 @@ export async function updateScoutRun(
       patch.costUsd ?? null,
       patch.issueIdentifier ?? null,
       patch.error ?? null,
+      patch.note ?? null,
       patch.finished ? new Date().toISOString() : null,
       instanceId,
       scoutId

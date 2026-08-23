@@ -74,6 +74,10 @@ function ScoutRow({ scout }: { scout: ScoutRunRecord }) {
           <span className="ml-2 text-xs text-destructive">
             {scout.error.slice(0, 60)}
           </span>
+        ) : scout.note ? (
+          <span className="ml-2 text-xs text-muted-foreground/80">
+            {scout.note}
+          </span>
         ) : null}
       </TableCell>
       <TableCell className="py-2 tabular-nums">
