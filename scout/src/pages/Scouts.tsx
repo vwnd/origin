@@ -240,7 +240,7 @@ export function Scouts() {
                 <MDEditor
                   value={draft.body}
                   height={480}
-                  preview="edit"
+                  preview="preview"
                   onChange={(value) =>
                     setDraft({ ...draft, body: value ?? "" })
                   }
