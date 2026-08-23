@@ -1,0 +1,21 @@
+/**
+ * Secrets used by the Speckle integration. Declared here (rather than in the
+ * generated `env.d.ts`) so `wrangler types` can be re-run without losing them.
+ *
+ * Set locally in `.dev.vars`, and in production with:
+ *   wrangler secret put SPECKLE_TOKEN
+ *   wrangler secret put SPECKLE_WEBHOOK_SECRET
+ */
+interface Env {
+  /** Speckle Personal Access Token. Needs the `streams:write` scope. */
+  SPECKLE_TOKEN: string;
+  /** Shared secret configured on the Speckle project webhook. */
+  SPECKLE_WEBHOOK_SECRET: string;
+  /** Bearer token gating the /debug/* diagnostics. Unset disables them. */
+  SCOUT_DEBUG_TOKEN: string;
+  /**
+   * Token required to write scouts through the API. Falls back to
+   * SCOUT_DEBUG_TOKEN when unset; with neither, writes are refused.
+   */
+  SCOUT_ADMIN_TOKEN: string;
+}

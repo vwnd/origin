@@ -1,0 +1,1311 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/geist-mono";
+
+/*
+ * Dark mode follows an explicit `.dark` class rather than only the OS setting,
+ * so a future toggle works without restructuring the tokens.
+ */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * shadcn design tokens.
+ *
+ * Declared here rather than imported: the `shadcn` package is the CLI and ships
+ * no stylesheet, so the `@import "shadcn/tailwind.css"` the init writes
+ * resolves to nothing and every `border-border`-style utility fails to build.
+ *
+ * Two layers, which is the Tailwind v4 shape. Raw values live on `:root` and
+ * `.dark` so a theme swap only rewrites this block; `@theme inline` then
+ * exposes them to Tailwind so `bg-background`, `border-border` and friends
+ * exist as real utilities.
+ */
+:root {
+  /*
+   * Paper, ink and one blue — the landing page's palette, promoted to the
+   * whole app so a card, a table row and the plate all belong to one sheet.
+   * Square corners throughout: the only curve in this design is the lens.
+   */
+  --radius: 0rem;
+  --background: #ebe8e1;
+  --foreground: #16181c;
+  --card: #f3f1eb;
+  --card-foreground: #16181c;
+  --popover: #f3f1eb;
+  --popover-foreground: #16181c;
+  --primary: #2323e6;
+  --primary-foreground: #ebe8e1;
+  --secondary: #e1ded5;
+  --secondary-foreground: #16181c;
+  --muted: #e3e0d7;
+  --muted-foreground: #6c7077;
+  --accent: #dedad0;
+  --accent-foreground: #16181c;
+  --destructive: #b8352a;
+  --destructive-foreground: #ebe8e1;
+  --border: rgba(22, 24, 28, 0.14);
+  --input: rgba(22, 24, 28, 0.22);
+  --ring: #2323e6;
+}
+
+.dark {
+  --background: #16181c;
+  --foreground: #ebe8e1;
+  --card: #1d2026;
+  --card-foreground: #ebe8e1;
+  --popover: #1d2026;
+  --popover-foreground: #ebe8e1;
+  --primary: #6b6bff;
+  --primary-foreground: #16181c;
+  --secondary: #24272e;
+  --secondary-foreground: #ebe8e1;
+  --muted: #24272e;
+  --muted-foreground: #9aa0a8;
+  --accent: #2a2e36;
+  --accent-foreground: #ebe8e1;
+  --destructive: #e0685c;
+  --destructive-foreground: #16181c;
+  --border: rgba(235, 232, 225, 0.14);
+  --input: rgba(235, 232, 225, 0.2);
+  --ring: #6b6bff;
+}
+
+@theme inline {
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", monospace;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/*
+ * The markdown editor ships its own palette. Map the surfaces it exposes onto
+ * the shadcn tokens so it does not sit in the page as a lighter rectangle.
+ */
+.w-md-editor {
+  --color-canvas-default: var(--background);
+  --color-fg-default: var(--foreground);
+  --color-border-default: var(--border);
+  background-color: var(--background);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.w-md-editor-toolbar {
+  background-color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+/*
+ * Landing page.
+ *
+ * A briefing sheet: a plate, a caption, a statement set large, a note in the
+ * margin. Set outside the shadcn token system on purpose — it has its own
+ * paper, its own ink, and one blue. Square corners throughout; the only curve
+ * on the page is the lens inside the plate.
+ */
+.origo-paper,
+.origo-paper body {
+  background-color: #ebe8e1;
+  overflow: hidden;
+  color-scheme: light;
+}
+
+.origo-sheet {
+  --paper: #ebe8e1;
+  --ink: #16181c;
+  --blue: #2323e6;
+  --muted: #6c7077;
+  --serif: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", monospace;
+
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 21rem);
+  gap: clamp(1.5rem, 3vw, 3.5rem);
+  padding: clamp(1.25rem, 2.4vw, 2.25rem);
+  overflow: hidden;
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+/*
+ * The plate covers the whole column and is notched out at the bottom left, so
+ * the caption and statement sit in paper with the blue still running down
+ * beside them. That asymmetry is the composition — without it this is a box.
+ */
+.origo-plate-column {
+  position: relative;
+  min-height: 0;
+}
+
+.origo-plate {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 63% 100%, 63% 62%, 0 62%);
+}
+
+.origo-wordmark {
+  position: absolute;
+  top: clamp(0.75rem, 1.8vw, 1.75rem);
+  left: clamp(0.875rem, 1.8vw, 1.75rem);
+  font-family: var(--serif);
+  font-size: clamp(1.75rem, 3.2vw, 3rem);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--paper);
+}
+
+.origo-foot {
+  position: absolute;
+  top: 62%;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: 60%;
+  flex-direction: column;
+  padding-top: clamp(0.875rem, 2vh, 1.5rem);
+}
+
+.origo-caption {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  line-height: 1.7;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.origo-statement {
+  margin-top: auto;
+  margin-bottom: clamp(1rem, 2.2vh, 1.75rem);
+  font-family: var(--serif);
+  font-size: clamp(1.5rem, 2.9vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+}
+
+/* Two lines are reserved, so the button never moves as the statement changes. */
+.origo-statement-box {
+  display: block;
+  min-height: 2.28em;
+}
+
+.origo-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.375rem;
+}
+
+/* The pitch deck's way in: set like the masthead nav, quiet next to the CTA. */
+.origo-cta-quiet {
+  padding-bottom: 0.125rem;
+  border-bottom: 1px solid rgba(22, 24, 28, 0.3);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  transition:
+    color 240ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.origo-cta-quiet:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.origo-cta-quiet:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.origo-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  align-self: flex-start;
+  background-color: var(--blue);
+  padding: 0.75rem 1.125rem 0.75rem 1.375rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--paper);
+  transition:
+    background-color 240ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.origo-cta:hover {
+  background-color: var(--ink);
+}
+
+.origo-cta:active {
+  transform: translateY(1px);
+  transition-duration: 90ms;
+}
+
+.origo-cta:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.origo-cta svg {
+  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.origo-cta:hover svg {
+  transform: translateX(3px);
+}
+
+.origo-margin {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.origo-lede {
+  font-family: var(--serif);
+  font-size: clamp(1.15rem, 1.65vw, 1.65rem);
+  font-weight: 400;
+  line-height: 1.18;
+  color: var(--blue);
+}
+
+/*
+ * Origo does not stop at telling you what is wrong, so the word "reviews" gets
+ * struck out in front of the reader rather than arriving pre-cancelled.
+ */
+.origo-strike {
+  position: relative;
+  white-space: nowrap;
+}
+
+.origo-strike::after {
+  content: "";
+  position: absolute;
+  top: 0.56em;
+  right: -0.05em;
+  left: -0.05em;
+  height: 1px;
+  background-color: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: origo-draw 420ms cubic-bezier(0.4, 0, 0.2, 1) 1700ms both;
+}
+
+.origo-margin-foot {
+  margin-top: auto;
+}
+
+.origo-rule {
+  border: 0;
+  border-top: 1px solid rgba(22, 24, 28, 0.18);
+}
+
+.origo-note {
+  max-width: 22rem;
+  margin-top: 1rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.origo-mark {
+  display: flex;
+  margin-top: clamp(1rem, 3vh, 2rem);
+  justify-content: flex-end;
+}
+
+/*
+ * The entrance: the plate draws itself, then everything set on paper arrives
+ * on a beat behind it. One easing curve throughout, nothing overshoots.
+ */
+@keyframes origo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes origo-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.origo-in {
+  animation: origo-rise 560ms cubic-bezier(0.4, 0, 0.2, 1)
+    var(--origo-delay, 0ms) both;
+}
+
+.origo-rule.origo-in {
+  transform-origin: left;
+  animation-name: origo-draw;
+  animation-duration: 640ms;
+}
+
+@media (max-width: 900px) {
+  .origo-paper,
+  .origo-paper body {
+    overflow: auto;
+  }
+
+  .origo-sheet {
+    position: static;
+    min-height: 100dvh;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .origo-plate-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* No room for the notch on a phone, so the plate goes back to a rectangle. */
+  .origo-plate {
+    position: relative;
+    inset: auto;
+    aspect-ratio: 4 / 3;
+    clip-path: none;
+  }
+
+  .origo-foot {
+    position: static;
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .origo-statement {
+    margin-top: 1.25rem;
+  }
+}
+
+/*
+ * The idea deck (/idea).
+ *
+ * Nine plates on the same sheet as the landing page: paper, ink, one blue.
+ * Each slide is a briefing spread — mono eyebrow, serif statement, a note,
+ * and a drawing on a blue plate that carries the argument. All motion runs on
+ * the landing page's single easing curve; nothing overshoots.
+ */
+.idea-sheet {
+  --paper: #ebe8e1;
+  --ink: #16181c;
+  --blue: #2323e6;
+  --muted: #6c7077;
+  --serif: "Newsreader Variable", Georgia, "Times New Roman", serif;
+  --mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", monospace;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 2vh, 1.75rem);
+  padding: clamp(1.25rem, 2.4vw, 2.25rem);
+  overflow: hidden;
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+.idea-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.idea-wordmark {
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.idea-head-label {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.idea-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.idea-slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(2rem, 4.5vw, 4.5rem);
+  align-items: center;
+}
+
+.idea-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.idea-eyebrow {
+  margin-bottom: clamp(1rem, 2.4vh, 1.75rem);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.idea-statement {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 4.4vw, 3.5rem);
+  font-weight: 400;
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+}
+
+.idea-note {
+  max-width: 26rem;
+  margin-top: clamp(1rem, 2.6vh, 1.75rem);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.idea-copy .origo-cta {
+  margin-top: clamp(1.25rem, 3vh, 2rem);
+}
+
+/* The plate: the drawing's blue ground, full height of the spread. */
+.idea-plate {
+  position: relative;
+  align-self: stretch;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--blue);
+}
+
+.idea-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.idea-mono {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.idea-foot {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.idea-foot-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.idea-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid rgba(22, 24, 28, 0.25);
+  color: var(--ink);
+  transition:
+    background-color 200ms var(--ease),
+    border-color 200ms var(--ease),
+    color 200ms var(--ease);
+}
+
+.idea-arrow:hover:not(:disabled) {
+  border-color: var(--blue);
+  background-color: var(--blue);
+  color: var(--paper);
+}
+
+.idea-arrow:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.idea-arrow:disabled {
+  opacity: 0.3;
+}
+
+/* Progress reads as a row of rules; the current one is blue and longer. */
+.idea-ticks {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.idea-tick {
+  width: 1.375rem;
+  height: 2px;
+  padding: 0;
+  background-color: rgba(22, 24, 28, 0.2);
+  transition:
+    background-color 240ms var(--ease),
+    width 240ms var(--ease);
+}
+
+.idea-tick:hover {
+  background-color: rgba(22, 24, 28, 0.45);
+}
+
+.idea-tick:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.idea-tick-active,
+.idea-tick-active:hover {
+  width: 2.5rem;
+  background-color: var(--blue);
+}
+
+.idea-count {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+/* The team, set on the plate like plates in a monograph: portraits printed
+   in the sheet's blue, names beneath in paper. */
+.idea-team {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: clamp(1rem, 2.2vw, 1.75rem);
+  padding: clamp(1.25rem, 2.6vw, 2.25rem);
+}
+
+.idea-team-cell {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  margin: 0;
+}
+
+.idea-team-photo {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: cover;
+  object-position: top;
+  /* Luminosity over the blue plate: portraits join the sheet's three colours
+     instead of arriving in their own. */
+  filter: grayscale(1) contrast(1.06);
+  mix-blend-mode: luminosity;
+  opacity: 0.92;
+}
+
+.idea-team-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.625rem;
+}
+
+.idea-team-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #ebe8e1;
+  white-space: nowrap;
+}
+
+.idea-team-firm {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(235, 232, 225, 0.55);
+}
+
+/* The outgoing slide accelerates away; the incoming one mounts fresh. */
+.idea-slide-leaving {
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+  transition:
+    opacity 220ms cubic-bezier(0.3, 0, 1, 1),
+    transform 220ms cubic-bezier(0.3, 0, 1, 1);
+}
+
+/* -- Slide motion. Entrances stagger on --d; each keyed remount restarts. -- */
+
+.idea-rise {
+  animation: origo-rise 560ms var(--ease) var(--d, 0ms) both;
+}
+
+/* A stroke drawing itself; every path sets pathLength=1. */
+.idea-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: idea-draw 700ms var(--ease) var(--d, 0ms) forwards;
+}
+
+.idea-draw-slow {
+  animation-duration: 1100ms;
+}
+
+@keyframes idea-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.idea-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: idea-pop 420ms var(--ease) var(--d, 0ms) both;
+}
+
+@keyframes idea-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Entropy: a tick letting go of the grid, then staying let-go. */
+.idea-tilt {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: idea-tilt 900ms var(--ease) var(--d, 0ms) both;
+}
+
+@keyframes idea-tilt {
+  from {
+    transform: none;
+  }
+  to {
+    transform: rotate(var(--tilt, 30deg));
+  }
+}
+
+/* Trust meter bars fill bottom-up. */
+.idea-grow {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: idea-grow 520ms var(--ease) var(--d, 0ms) both;
+}
+
+@keyframes idea-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Standards lines write themselves left to right. */
+.idea-write {
+  transform-box: fill-box;
+  transform-origin: left;
+  animation: idea-grow-x 560ms var(--ease) var(--d, 0ms) both;
+}
+
+@keyframes idea-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* The fix travelling the loop: ambient, linear, endless. */
+.idea-orbit {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: idea-orbit 9s linear infinite;
+}
+
+@keyframes idea-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The closing mark breathes once it has drawn. */
+.idea-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: idea-pulse 4s var(--ease) 1800ms infinite;
+}
+
+@keyframes idea-pulse {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  60% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+/* -- Architecture plate: one story on one clock. ---------------------------
+   Every cube and every station reaction runs the same 10s cycle; each owns a
+   keyframe window on it, so cause visibly precedes effect: publish (2–14%),
+   Speckle blips (13–17), notify (16–27), Origo pings (26–38), the fleet fans
+   out (28–38), the scouts work (39–56), findings converge (55–65), the issue
+   log brightens (63–96), the finding reaches review (67–76), the check pops
+   (76–92), the fix travels home (80–92), the model blinks fixed (93–97). */
+
+.idea-arch {
+  animation-duration: 10s;
+  animation-timing-function: linear;
+  animation-delay: 1600ms;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+.idea-cube {
+  offset-path: var(--path);
+  offset-rotate: 0deg;
+  opacity: 0;
+}
+
+/* Reactions rest invisible between their beats. */
+.idea-arch-ping,
+.idea-arch-work,
+.idea-arch-log,
+.idea-arch-fixed,
+.idea-arch-check {
+  opacity: 0;
+}
+
+.idea-arch-leg-a {
+  animation-name: idea-arch-leg-a;
+}
+.idea-arch-leg-b {
+  animation-name: idea-arch-leg-b;
+}
+.idea-arch-leg-c {
+  animation-name: idea-arch-leg-c;
+}
+.idea-arch-leg-d {
+  animation-name: idea-arch-leg-d;
+}
+.idea-arch-leg-e {
+  animation-name: idea-arch-leg-e;
+}
+.idea-arch-leg-f {
+  animation-name: idea-arch-leg-f;
+}
+
+/* Parcels ease in and out of each hop — handed off, not conveyed. */
+@keyframes idea-arch-leg-a {
+  0%,
+  2% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  3.2% {
+    opacity: 1;
+  }
+  12.8% {
+    opacity: 1;
+  }
+  14%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-b {
+  0%,
+  16% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  17.2% {
+    opacity: 1;
+  }
+  25.8% {
+    opacity: 1;
+  }
+  27%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-c {
+  0%,
+  28% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  29.2% {
+    opacity: 1;
+  }
+  36.8% {
+    opacity: 1;
+  }
+  38%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-d {
+  0%,
+  55% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  56.2% {
+    opacity: 1;
+  }
+  63.8% {
+    opacity: 1;
+  }
+  65%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-e {
+  0%,
+  67% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  68.2% {
+    opacity: 1;
+  }
+  74.8% {
+    opacity: 1;
+  }
+  76%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes idea-arch-leg-f {
+  0%,
+  80% {
+    offset-distance: 0%;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  }
+  81.2% {
+    opacity: 1;
+  }
+  90.8% {
+    opacity: 1;
+  }
+  92%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* Speckle acknowledges the publish. */
+.idea-arch-blip {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: idea-arch-blip;
+}
+
+@keyframes idea-arch-blip {
+  0%,
+  13% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.16);
+  }
+  17%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Origo's ring pings once, as the notification lands — and fires the fleet. */
+.idea-arch-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: idea-arch-ping;
+}
+
+@keyframes idea-arch-ping {
+  0%,
+  26% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  27.5% {
+    opacity: 0.7;
+  }
+  38%,
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* Scouts flicker while they work the version. */
+.idea-arch-work {
+  animation-name: idea-arch-work;
+}
+
+@keyframes idea-arch-work {
+  0%,
+  39% {
+    opacity: 0;
+  }
+  40.5%,
+  43% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.3;
+  }
+  47%,
+  50% {
+    opacity: 1;
+  }
+  52% {
+    opacity: 0.4;
+  }
+  54%,
+  56% {
+    opacity: 1;
+  }
+  58%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The issue log brightens when the findings are filed, and holds. */
+.idea-arch-log {
+  animation-name: idea-arch-log;
+}
+
+@keyframes idea-arch-log {
+  0%,
+  63% {
+    opacity: 0;
+  }
+  65%,
+  96% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The approval: a small pop with a touch of overshoot — a human said yes. */
+.idea-arch-check {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: idea-arch-check;
+}
+
+@keyframes idea-arch-check {
+  0%,
+  76% {
+    opacity: 0;
+    transform: scale(0.4);
+    animation-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  88% {
+    opacity: 1;
+  }
+  92%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* The model blinks solid as the fix lands: this cycle's publish comes back
+   fixed, and the next one begins. */
+.idea-arch-fixed {
+  animation-name: idea-arch-fixed;
+}
+
+@keyframes idea-arch-fixed {
+  0%,
+  91.5% {
+    opacity: 0;
+  }
+  93%,
+  96.5% {
+    opacity: 0.9;
+  }
+  98.5%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Warnings plate: an endless, ownerless scroll. */
+.idea-warnings {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: clamp(1rem, 2.5vw, 2rem);
+}
+
+.idea-warn-scroll {
+  animation: idea-scroll 18s linear infinite;
+}
+
+@keyframes idea-scroll {
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.idea-warn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding-bottom: 0.875rem;
+}
+
+.idea-warn-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.idea-warn-index {
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  color: rgba(235, 232, 225, 0.45);
+}
+
+.idea-warn-line {
+  height: 2px;
+  background-color: rgba(235, 232, 225, 0.32);
+}
+
+.idea-warn-count {
+  position: absolute;
+  right: clamp(1rem, 2.5vw, 2rem);
+  bottom: clamp(0.875rem, 2vw, 1.5rem);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ebe8e1;
+}
+
+/* A soft fade so the scroll enters and leaves the plate, not the edge. */
+.idea-warnings::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    #2323e6,
+    rgba(35, 35, 230, 0) 18%,
+    rgba(35, 35, 230, 0) 70%,
+    #2323e6
+  );
+}
+
+@media (max-width: 900px) {
+  .idea-sheet {
+    position: static;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .idea-stage {
+    flex: none;
+  }
+
+  .idea-slide {
+    position: static;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+
+  /* The plate leads on a phone, the way the landing page's does. */
+  .idea-plate {
+    order: -1;
+    aspect-ratio: 4 / 3;
+    align-self: auto;
+  }
+
+  .idea-foot {
+    gap: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .origo-in {
+    animation: none;
+  }
+
+  .idea-rise,
+  .idea-pop,
+  .idea-grow,
+  .idea-write,
+  .idea-tilt {
+    animation: none;
+  }
+
+  /* Hold each drawing at its finished frame. */
+  .idea-tilt {
+    transform: rotate(var(--tilt, 30deg));
+  }
+
+  .idea-draw {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+
+  .idea-orbit,
+  .idea-warn-scroll,
+  .idea-pulse {
+    animation: none;
+  }
+
+  /* Still the relay at a legible frame: cubes held mid-pipe, the filed log
+     and the approval shown, the transient blinks hidden. */
+  .idea-arch {
+    animation: none;
+  }
+
+  .idea-cube {
+    offset-distance: 55%;
+    opacity: 1;
+  }
+
+  .idea-arch-work,
+  .idea-arch-log,
+  .idea-arch-check {
+    opacity: 1;
+    transform: none;
+  }
+
+  .idea-arrow,
+  .idea-tick {
+    transition: none;
+  }
+
+  .origo-strike::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+
+  .origo-cta,
+  .origo-cta svg {
+    transition: none;
+  }
+
+  .origo-cta:hover svg {
+    transform: none;
+  }
+}

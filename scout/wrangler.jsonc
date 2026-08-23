@@ -1,0 +1,94 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "scout",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-06-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/agents/*", "/webhooks/*", "/debug/*", "/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "InspectionAgent",
+        "name": "InspectionAgent"
+      },
+      {
+        "class_name": "EventsAgent",
+        "name": "EventsAgent"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["ChatAgent"],
+      "tag": "v1"
+    },
+    {
+      "new_sqlite_classes": ["InspectionAgent"],
+      "tag": "v2"
+    },
+    {
+      "new_sqlite_classes": ["EventsAgent"],
+      "tag": "v3"
+    },
+    {
+      // The starter's chat agent, removed. Named here so its stored state is
+      // dropped rather than orphaned.
+      "deleted_classes": ["ChatAgent"],
+      "tag": "v4"
+    }
+  ],
+  // Streaming and parsing a large version is CPU-bound; the default 30s is not
+  // enough for a 160 MB model.
+  "limits": {
+    "cpu_ms": 300000
+  },
+  // Reaper cron: resolves runs whose workflow died without a catchable error
+  // (exceededCpu kills the isolate outright) to a terminal state in D1.
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  // The long-running load lives in a Workflow: durable retry if Speckle blips
+  // mid-stream, with explicit per-step timeouts set in workflow.ts.
+  "workflows": [
+    {
+      "name": "scout-inspection",
+      "binding": "INSPECTION_WORKFLOW",
+      "class_name": "InspectionWorkflow"
+    }
+  ],
+  // Scout instruction bodies live in R2 (markdown, edited in the UI) with their
+  // metadata in D1, so they can be changed without a redeploy.
+  "r2_buckets": [
+    {
+      "binding": "INSTRUCTIONS",
+      "bucket_name": "scout-instructions"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "scout-metadata",
+      "database_id": "fcdb26ec-e114-482b-85c2-c0cf5285f8da"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  // Custom metrics for the Speckle webhook pipeline. Query with the
+  // Analytics Engine SQL API — see the README.
+  "analytics_engine_datasets": [
+    {
+      "binding": "SCOUT_ANALYTICS",
+      "dataset": "scout_speckle_deliveries"
+    }
+  ],
+  // Lets each data point and log line name the deployment that produced it.
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  }
+}
