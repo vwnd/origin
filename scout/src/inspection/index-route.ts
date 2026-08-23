@@ -5,7 +5,7 @@ import {
   collapseDuplicates,
   extractFingerprints,
   fingerprint,
-  renderSummaryIssue,
+  renderScoutIssue,
   sortFindings,
   type Finding
 } from "./findings";
@@ -331,7 +331,10 @@ export async function runFileIssue(
 
   const info = await getVersionInfo(env.SPECKLE_TOKEN, projectId, versionId);
   const modelId = info.version?.model?.id ?? null;
-  const rendered = renderSummaryIssue({
+  const rendered = renderScoutIssue({
+    // The harness accepts findings from any instruction; name the issue after
+    // the one that produced them, as the pipeline's per-scout issues do.
+    scoutTitle: fresh[0].finding.instructionId,
     findings: fresh.map((entry) => entry.finding),
     fingerprints: fresh.map((entry) => entry.print),
     versionId,

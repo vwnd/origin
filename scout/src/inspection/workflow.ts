@@ -26,8 +26,7 @@ import {
   collapseDuplicates,
   extractFingerprints,
   fingerprint,
-  renderSummaryIssue,
-  type Finding
+  renderScoutIssue
 } from "./findings";
 import { buildDeltas } from "./deltas";
 import type { InspectionAgent } from "./agent";
@@ -35,7 +34,12 @@ import type { InspectionAgent } from "./agent";
 /**
  * The whole pipeline for one published version:
  *
- *   VersionCreated -> LoadInstruction -> IndexVersion -> Inspect -> CreateIssue
+ *   VersionCreated -> LoadInstructions -> IndexVersion
+ *     -> for each enabled scout: Inspect -> Dedupe -> CreateIssue -> AttachDeltas
+ *
+ * The version is indexed once — that is the expensive part — and then every
+ * active scout runs against the shared index and files its own issue carrying
+ * its own proposed fixes, so the inbox shows one issue per scout.
  *
  * Durable because the load takes minutes. Each step carries an explicit
  * StepConfig — the platform default (10-minute timeout, 5 retries) is wrong
@@ -186,8 +190,8 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
 
     // Own step so a malformed instruction fails loudly before we spend a load.
     // Loaded from R2 so scouts can be edited in the UI without a redeploy.
-    // Ids only: bodies are large and would count against the 1 MiB step-result
-    // cap, so the inspect step re-reads them.
+    // Ids and titles only: bodies are large and would count against the 1 MiB
+    // step-result cap, so each scout's inspect step re-reads its own.
     const instructions = await step.do(
       "load-instructions",
       API_STEP,
@@ -196,7 +200,7 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
         if (enabled.length === 0) {
           throw new NonRetryableError("No enabled scouts");
         }
-        return enabled.map((instruction) => instruction.id);
+        return enabled.map(({ id, title }) => ({ id, title }));
       }
     );
 
@@ -293,88 +297,196 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
       at: new Date().toISOString()
     });
 
-    const inspection = await step.do("inspect", INSPECT_STEP, async () => {
-      if (!this.env.ANTHROPIC_API_KEY) {
-        throw new NonRetryableError("ANTHROPIC_API_KEY is not configured");
-      }
-      const agent = await getAgentByName<Env, InspectionAgent>(
-        this.env.InspectionAgent,
-        versionId
+    // One scout run per enabled scout, all against the shared index. Each
+    // scout inspects, dedupes, and files its own issue with its own fixes —
+    // so an issue in the inbox always traces back to exactly one scout, and a
+    // retry mid-fleet resumes after the scouts that already filed.
+    const totals = { findings: 0, deltas: 0, costUsd: 0 };
+    const filed: string[] = [];
+
+    for (const scout of instructions) {
+      const inspected = await step.do(
+        `inspect-${scout.id}`,
+        INSPECT_STEP,
+        async () => {
+          if (!this.env.ANTHROPIC_API_KEY) {
+            throw new NonRetryableError("ANTHROPIC_API_KEY is not configured");
+          }
+          // Re-read the body from the store; a scout disabled or deleted
+          // since the run began is skipped rather than failed.
+          const instruction = (await loadEnabledScouts(this.env)).find(
+            (item) => item.id === scout.id
+          );
+          if (!instruction) return null;
+
+          const agent = await this.agentFor(versionId);
+          const result = await runInstruction({
+            apiKey: this.env.ANTHROPIC_API_KEY,
+            instruction,
+            agent,
+            modelName: version.modelName,
+            logger
+          });
+
+          // A systemic failure must not look like a clean model — fail the
+          // step so it retries rather than filing "no findings".
+          if (result.stoppedBecause === "failed") {
+            throw new Error(`Inspection failed: ${result.error ?? "unknown"}`);
+          }
+
+          // Collapse the same problem seen through denormalized parameters.
+          return {
+            findings: collapseDuplicates(result.findings),
+            estimatedCostUsd: result.usage.estimatedCostUsd
+          };
+        }
       );
 
-      const findings: Finding[] = [];
-      let estimatedCostUsd = 0;
-      const scouts = await loadEnabledScouts(this.env);
+      if (!inspected) continue;
+      totals.costUsd += inspected.estimatedCostUsd;
 
-      for (const instructionId of instructions) {
-        const instruction = scouts.find((item) => item.id === instructionId);
-        if (!instruction) continue;
+      // Dedupe against what is already open on the project, so republishing a
+      // model with an unfixed problem does not file it again.
+      const novel = await step.do(`dedupe-${scout.id}`, API_STEP, async () => {
+        const withPrints = await Promise.all(
+          inspected.findings.map(async (finding) => ({
+            finding,
+            print: await fingerprint(finding)
+          }))
+        );
 
-        const result = await runInstruction({
-          apiKey: this.env.ANTHROPIC_API_KEY,
-          instruction,
-          agent,
-          modelName: version.modelName,
-          logger
-        });
-
-        // A systemic failure must not look like a clean model — fail the step
-        // so it retries rather than filing "no findings".
-        if (result.stoppedBecause === "failed") {
-          throw new Error(`Inspection failed: ${result.error ?? "unknown"}`);
+        if (!SUPPRESS_ALREADY_REPORTED) {
+          logger.info("dedupe_skipped", {
+            scout: scout.id,
+            findings: withPrints.length
+          });
+          return {
+            findings: withPrints.map((entry) => entry.finding),
+            fingerprints: withPrints.map((entry) => entry.print)
+          };
         }
 
-        findings.push(...result.findings);
-        estimatedCostUsd += result.usage.estimatedCostUsd;
-      }
+        const open = await listOpenIssues(this.env.SPECKLE_TOKEN, projectId);
+        const seen = extractFingerprints(
+          open.map((issue) => issue.rawDescription)
+        );
 
-      // Collapse the same problem seen through denormalized parameters.
-      return { findings: collapseDuplicates(findings), estimatedCostUsd };
-    });
+        const fresh = withPrints.filter((entry) => !seen.has(entry.print));
+        logger.info("dedupe_complete", {
+          scout: scout.id,
+          found: withPrints.length,
+          alreadyOpen: withPrints.length - fresh.length,
+          novel: fresh.length,
+          openIssuesScanned: open.length
+        });
 
-    // Dedupe against what is already open on the project, so republishing a
-    // model with an unfixed problem does not file it again.
-    const novel = await step.do("dedupe", API_STEP, async () => {
-      const withPrints = await Promise.all(
-        inspection.findings.map(async (finding) => ({
-          finding,
-          print: await fingerprint(finding)
-        }))
-      );
-
-      if (!SUPPRESS_ALREADY_REPORTED) {
-        logger.info("dedupe_skipped", { findings: withPrints.length });
         return {
-          findings: withPrints.map((entry) => entry.finding),
-          fingerprints: withPrints.map((entry) => entry.print)
+          findings: fresh.map((entry) => entry.finding),
+          fingerprints: fresh.map((entry) => entry.print)
         };
-      }
-
-      const open = await listOpenIssues(this.env.SPECKLE_TOKEN, projectId);
-      const seen = extractFingerprints(
-        open.map((issue) => issue.rawDescription)
-      );
-
-      const fresh = withPrints.filter((entry) => !seen.has(entry.print));
-      logger.info("dedupe_complete", {
-        found: withPrints.length,
-        alreadyOpen: withPrints.length - fresh.length,
-        novel: fresh.length,
-        openIssuesScanned: open.length
       });
 
-      return {
-        findings: fresh.map((entry) => entry.finding),
-        fingerprints: fresh.map((entry) => entry.print)
-      };
-    });
+      // Liveness between scouts: a fleet of inspections can quietly outlast
+      // the reaper's stall window even though each step is healthy.
+      await updateRun(this.env, event.instanceId, { heartbeat: true });
 
-    if (novel.findings.length === 0) {
+      if (novel.findings.length === 0) {
+        await publishEvent(this.env, {
+          type: "run_progress",
+          instanceId: event.instanceId,
+          versionId,
+          step: "scout_complete",
+          detail: { scout: scout.title, findings: 0, issue: null },
+          at: new Date().toISOString()
+        });
+        continue;
+      }
+
+      const issue = await step.do(
+        `create-issue-${scout.id}`,
+        API_STEP,
+        async () => {
+          const rendered = renderScoutIssue({
+            scoutTitle: scout.title,
+            findings: novel.findings,
+            fingerprints: novel.fingerprints,
+            versionId,
+            modelName: version.modelName
+          });
+
+          const link = version.modelId
+            ? `\n\n${versionUrl(projectId, version.modelId, versionId)}`
+            : "";
+
+          const created = await createIssue(this.env.SPECKLE_TOKEN, {
+            projectId,
+            title: rendered.title,
+            // No anchor: pinning to the version needs a viewerState and
+            // screenshot alongside the resource id, which are out of scope.
+            description: rendered.description + link
+          });
+
+          return { identifier: created.identifier, id: created.id };
+        }
+      );
+
+      // Attach the proposed edits, mirroring Speckle's parameter updater, so
+      // the issue carries fixes to review rather than only a description of
+      // what is wrong. Non-fatal: the issue is already filed and useful
+      // without it.
+      const meta = await step.do(
+        `attach-deltas-${scout.id}`,
+        DELTAS_STEP,
+        async () => {
+          if (!version.workspaceId) {
+            logger.warn("deltas_skipped", { reason: "no workspaceId" });
+            return { attached: 0 };
+          }
+
+          const agent = await this.agentFor(versionId);
+          const built = await buildDeltas({
+            findings: novel.findings,
+            agent,
+            logger
+          });
+          if (built.deltas.length === 0) return { attached: 0 };
+
+          await createResourceMeta(this.env.SPECKLE_TOKEN, {
+            projectId,
+            workspaceId: version.workspaceId,
+            issueId: issue.id,
+            changes: built.deltas
+          });
+
+          return { attached: built.deltas.length };
+        }
+      );
+
+      totals.findings += novel.findings.length;
+      totals.deltas += meta.attached;
+      filed.push(issue.identifier);
+
+      await publishEvent(this.env, {
+        type: "run_progress",
+        instanceId: event.instanceId,
+        versionId,
+        step: "scout_complete",
+        detail: {
+          scout: scout.title,
+          findings: novel.findings.length,
+          deltas: meta.attached,
+          issue: issue.identifier
+        },
+        at: new Date().toISOString()
+      });
+    }
+
+    if (filed.length === 0) {
       await updateRun(this.env, event.instanceId, {
         status: "no_findings",
         findings: 0,
         deltas: 0,
-        costUsd: inspection.estimatedCostUsd,
+        costUsd: totals.costUsd,
         finished: true
       });
       await publishEvent(this.env, {
@@ -389,78 +501,22 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
       });
       logger.info("run_complete", {
         outcome: "no_new_findings",
-        totalFindings: inspection.findings.length,
-        estimatedCostUsd: inspection.estimatedCostUsd
+        scouts: instructions.length,
+        estimatedCostUsd: totals.costUsd
       });
-      return {
-        outcome: "no_new_findings" as const,
-        findings: inspection.findings.length,
-        load
-      };
+      return { outcome: "no_new_findings" as const, findings: 0, load };
     }
 
-    const issue = await step.do("create-issue", API_STEP, async () => {
-      const rendered = renderSummaryIssue({
-        findings: novel.findings,
-        fingerprints: novel.fingerprints,
-        versionId,
-        modelName: version.modelName
-      });
-
-      const link = version.modelId
-        ? `\n\n${versionUrl(projectId, version.modelId, versionId)}`
-        : "";
-
-      const created = await createIssue(this.env.SPECKLE_TOKEN, {
-        projectId,
-        title: rendered.title,
-        // No anchor: pinning to the version needs a viewerState and screenshot
-        // alongside the resource id, which are out of scope.
-        description: rendered.description + link
-      });
-
-      return { identifier: created.identifier, id: created.id };
-    });
-
-    // Attach the proposed edits, mirroring Speckle's parameter updater, so the
-    // issue carries fixes to review rather than only a description of what is
-    // wrong. Non-fatal: the issue is already filed and useful without it.
-    const meta = await step.do("attach-deltas", DELTAS_STEP, async () => {
-      if (!version.workspaceId) {
-        logger.warn("deltas_skipped", { reason: "no workspaceId" });
-        return { attached: 0 };
-      }
-
-      const agent = await getAgentByName<Env, InspectionAgent>(
-        this.env.InspectionAgent,
-        versionId
-      );
-      const built = await buildDeltas({
-        findings: novel.findings,
-        agent,
-        logger
-      });
-      if (built.deltas.length === 0) return { attached: 0 };
-
-      await createResourceMeta(this.env.SPECKLE_TOKEN, {
-        projectId,
-        workspaceId: version.workspaceId,
-        issueId: issue.id,
-        changes: built.deltas
-      });
-
-      return {
-        attached: built.deltas.length,
-        actionableFindings: built.actionableFindings
-      };
-    });
+    // Several scouts may each have filed an issue; the run record and the
+    // toast carry all of their identifiers.
+    const issueIdentifier = filed.join(", ");
 
     await updateRun(this.env, event.instanceId, {
       status: "complete",
-      findings: novel.findings.length,
-      deltas: meta.attached,
-      costUsd: inspection.estimatedCostUsd,
-      issueIdentifier: issue.identifier,
+      findings: totals.findings,
+      deltas: totals.deltas,
+      costUsd: totals.costUsd,
+      issueIdentifier,
       finished: true
     });
     await publishEvent(this.env, {
@@ -468,25 +524,25 @@ export class InspectionWorkflow extends WorkflowEntrypoint<
       instanceId: event.instanceId,
       versionId,
       outcome: "issue_created",
-      findings: novel.findings.length,
-      deltas: meta.attached,
-      issueIdentifier: issue.identifier,
+      findings: totals.findings,
+      deltas: totals.deltas,
+      issueIdentifier,
       at: new Date().toISOString()
     });
 
     logger.info("run_complete", {
       outcome: "issue_created",
-      issue: issue.identifier,
-      findings: novel.findings.length,
-      deltasAttached: meta.attached,
-      estimatedCostUsd: inspection.estimatedCostUsd
+      issues: filed,
+      findings: totals.findings,
+      deltasAttached: totals.deltas,
+      estimatedCostUsd: totals.costUsd
     });
 
     return {
       outcome: "issue_created" as const,
-      issue,
-      findings: novel.findings.length,
-      deltas: meta.attached,
+      issues: filed,
+      findings: totals.findings,
+      deltas: totals.deltas,
       load
     };
   }

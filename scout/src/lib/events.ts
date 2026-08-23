@@ -32,6 +32,7 @@ export type ScoutEvent =
       outcome: string;
       findings: number;
       deltas: number;
+      /** Comma-joined when several scouts each filed an issue on this run. */
       issueIdentifier: string | null;
       at: string;
     }

@@ -40,7 +40,13 @@ function Shell() {
         if (event.step === "indexed") {
           const objects = Number(event.detail?.objects ?? 0);
           toast.message("Version indexed", {
-            description: `${objects.toLocaleString()} objects — judging parameters.`
+            description: `${objects.toLocaleString()} objects — the scouts are judging parameters.`
+          });
+        }
+        // Each scout files its own issue; announce it the moment it lands.
+        if (event.step === "scout_complete" && event.detail?.issue) {
+          toast.success(`${event.detail.issue} filed`, {
+            description: `${event.detail.scout}: ${Number(event.detail.findings ?? 0)} findings, ${Number(event.detail.deltas ?? 0)} proposed edits.`
           });
         }
         setRefreshKey((key) => key + 1);
@@ -48,8 +54,8 @@ function Shell() {
 
       case "run_complete":
         if (event.outcome === "issue_created") {
-          toast.success(`${event.issueIdentifier} filed`, {
-            description: `${event.findings} findings, ${event.deltas} proposed edits.`
+          toast.success("Inspection complete", {
+            description: `${event.findings} findings, ${event.deltas} proposed edits — ${event.issueIdentifier}.`
           });
         } else {
           toast.success("Inspection complete", {

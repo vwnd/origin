@@ -113,22 +113,25 @@ export type RenderedIssue = {
 };
 
 /**
- * One summary issue per run, listing every finding with its evidence.
+ * One issue per scout per run, listing that scout's findings with their
+ * evidence. Each active scout files its own issue, so the inbox shows which
+ * scout raised what and the attached fixes stay scoped to one instruction.
  *
  * Counts are shown because they are the argument: "1 object says this, 500 say
  * that" is what makes a finding actionable without opening the model.
  */
-export function renderSummaryIssue(options: {
+export function renderScoutIssue(options: {
+  scoutTitle: string;
   findings: Finding[];
   fingerprints: string[];
   versionId: string;
   modelName: string | null;
 }): RenderedIssue {
-  const { findings, versionId, modelName } = options;
+  const { scoutTitle, findings, versionId, modelName } = options;
   const count = findings.length;
 
   const lines: string[] = [
-    `Scout reviewed ${modelName ? `"${modelName}"` : "this model"} at version ${versionId} and found ${count} ${count === 1 ? "issue" : "issues"}.`,
+    `Scout "${scoutTitle}" reviewed ${modelName ? `"${modelName}"` : "this model"} at version ${versionId} and found ${count} ${count === 1 ? "issue" : "issues"}.`,
     ""
   ];
 
@@ -146,7 +149,7 @@ export function renderSummaryIssue(options: {
   lines.push(renderFingerprintMarker(options.fingerprints));
 
   return {
-    title: `Scout: ${count} ${count === 1 ? "finding" : "findings"} on version ${versionId}`,
+    title: `Scout: ${scoutTitle} — ${count} ${count === 1 ? "finding" : "findings"} on version ${versionId}`,
     description: lines.join("\n")
   };
 }
