@@ -94,7 +94,7 @@ function Shell() {
             to="/"
             className="bg-primary px-3 py-1.5 font-serif text-2xl leading-none text-primary-foreground transition-colors hover:bg-foreground hover:text-background"
           >
-            Origo
+            origo
           </Link>
 
           <nav className="flex items-baseline gap-6">

@@ -615,6 +615,187 @@ function ArchitecturePlate() {
   );
 }
 
+/**
+ * The system — a colleague's design, integrated as a guest slide: blue ink
+ * on the sheet's own paper instead of paper on a blue plate, so it renders
+ * full-bleed (`full: true`) rather than through the copy + plate split.
+ * Five stations on the loop, with an honest built/designed legend: filled
+ * blue nodes exist, hollow ones are designed but not yet built.
+ */
+type SystemStation = {
+  /** The numbered tag line, status included when it has one. */
+  tag: string;
+  title: string;
+  sub: string;
+  built: boolean;
+  /** Degrees on the ring, 0 = east, counter-clockwise. */
+  angle: number;
+};
+
+const SYSTEM_STATIONS: SystemStation[] = [
+  {
+    tag: "01",
+    title: "Capture & transport",
+    sub: "parameters only — geometry never fetched\n863 MB → 122.5 MB",
+    built: true,
+    angle: 90
+  },
+  {
+    tag: "02 · customer-owned",
+    title: "Knowledge layer",
+    sub: "the firm's own standards, in markdown",
+    built: false,
+    angle: 18
+  },
+  {
+    tag: "03",
+    title: "Agent fleet",
+    sub: "scouts scope themselves · the model judges one histogram",
+    built: true,
+    angle: -54
+  },
+  {
+    tag: "04",
+    title: "Delivery & approval",
+    sub: "a Speckle issue → a change request in Revit",
+    built: true,
+    angle: 234
+  },
+  {
+    tag: "05 · designed",
+    title: "Feedback loop",
+    sub: "rejections rewrite the standards",
+    built: false,
+    angle: 162
+  }
+];
+
+const SYSTEM_R = 100;
+
+function SystemPlate() {
+  const point = (angle: number, radius: number) => {
+    const rad = (angle * Math.PI) / 180;
+    return { x: Math.cos(rad) * radius, y: -Math.sin(rad) * radius };
+  };
+
+  return (
+    <div className="idea-system">
+      <div className="idea-system-ring">
+        <svg viewBox="-132 -132 264 264" className="size-full" aria-hidden>
+          <circle
+            r={76}
+            fill="none"
+            stroke="rgba(35, 35, 230, 0.3)"
+            strokeWidth={1}
+            strokeDasharray="1 6"
+            strokeLinecap="round"
+          />
+          <circle
+            r={SYSTEM_R}
+            fill="none"
+            stroke="var(--blue)"
+            strokeWidth={1.5}
+            pathLength={1}
+            className="idea-draw idea-draw-slow"
+            style={delay(200)}
+          />
+          {/* clockwise arrowheads between stations */}
+          {[54, -18, -90, 126, 198].map((angle) => {
+            const at = point(angle, SYSTEM_R);
+            const rad = (angle * Math.PI) / 180;
+            const rot =
+              (Math.atan2(Math.cos(rad), Math.sin(rad)) * 180) / Math.PI;
+            return (
+              <path
+                key={angle}
+                d="M-5 -3.5 L3 0 L-5 3.5"
+                fill="none"
+                stroke="var(--blue)"
+                strokeWidth={1.5}
+                transform={`translate(${at.x} ${at.y}) rotate(${rot})`}
+                className="idea-rise"
+                style={delay(1000)}
+              />
+            );
+          })}
+          {/* flanking ticks: the loop keeps moving past every station */}
+          {SYSTEM_STATIONS.flatMap((station) =>
+            [-11, 11].map((offset) => {
+              const from = point(station.angle + offset, SYSTEM_R + 8);
+              const to = point(station.angle + offset, SYSTEM_R + 17);
+              return (
+                <line
+                  key={`${station.angle}-${offset}`}
+                  x1={from.x}
+                  y1={from.y}
+                  x2={to.x}
+                  y2={to.y}
+                  stroke="rgba(35, 35, 230, 0.3)"
+                  strokeWidth={1.5}
+                />
+              );
+            })
+          )}
+          {SYSTEM_STATIONS.map((station, i) => {
+            const at = point(station.angle, SYSTEM_R);
+            return (
+              <g
+                key={station.title}
+                className="idea-pop"
+                style={delay(500 + i * 120)}
+              >
+                {station.built ? (
+                  <circle cx={at.x} cy={at.y} r={9} fill="var(--blue)" />
+                ) : (
+                  <circle
+                    cx={at.x}
+                    cy={at.y}
+                    r={9}
+                    fill="var(--paper)"
+                    stroke="rgba(22, 24, 28, 0.35)"
+                    strokeWidth={2}
+                  />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+        <p className="idea-system-center idea-rise" style={delay(700)}>
+          The loop is the product
+        </p>
+      </div>
+
+      {SYSTEM_STATIONS.map((station, i) => (
+        <div
+          key={station.title}
+          className={`idea-system-station idea-system-s${i + 1} idea-rise`}
+          style={delay(300 + i * 130)}
+        >
+          <p
+            className={
+              station.built
+                ? "idea-system-tag"
+                : "idea-system-tag idea-system-dim"
+            }
+          >
+            {station.tag}
+          </p>
+          <p
+            className={
+              station.built
+                ? "idea-system-title"
+                : "idea-system-title idea-system-dim"
+            }
+          >
+            {station.title}
+          </p>
+          <p className="idea-system-sub">{station.sub}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The mark, drawn in front of the reader: a circle and its origin. */
 function ClosePlate() {
   return (
@@ -661,6 +842,8 @@ type Slide = {
   note: ReactNode;
   plate: () => ReactNode;
   cta?: boolean;
+  /** Full-bleed on the sheet's paper, no copy + plate split. */
+  full?: boolean;
 };
 
 /*
@@ -715,6 +898,13 @@ const SLIDES: Slide[] = [
     statement: "Publish the model. The fleet does the rest.",
     note: "A publish lands in Speckle and wakes Origo. Scouts fan out over the version, file what they find as issues with the fixes pre-drafted, and you review them in Origo. Only what you approve flows back — the next publish comes back fixed.",
     plate: ArchitecturePlate
+  },
+  {
+    eyebrow: "07 — The system",
+    statement: "The loop is the product.",
+    note: "Five stations; three built, two designed — the honesty is the point.",
+    plate: SystemPlate,
+    full: true
   },
   {
     eyebrow: "Origo",
@@ -823,47 +1013,70 @@ export function Idea() {
       <div className="idea-stage">
         <section
           key={index}
-          className={leaving ? "idea-slide idea-slide-leaving" : "idea-slide"}
+          className={[
+            "idea-slide",
+            slide.full && "idea-slide-bare",
+            leaving && "idea-slide-leaving"
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
-          <div className="idea-copy">
-            <p className="idea-eyebrow idea-rise" style={delay(0)}>
-              {slide.eyebrow}
-            </p>
-
-            {reduced ? (
-              <h1 className="idea-statement">{slide.statement}</h1>
-            ) : (
-              <TextAnimate
-                as="h1"
-                className="idea-statement"
-                animation="blurInUp"
-                by="word"
-                duration={0.6}
-                delay={0.12}
-                startOnView={false}
-                once
-              >
-                {slide.statement}
-              </TextAnimate>
-            )}
-
-            <p className="idea-note idea-rise" style={delay(420)}>
-              {slide.note}
-            </p>
-
-            {slide.cta && (
-              <div className="idea-rise" style={delay(640)}>
-                <Link to="/inbox" className="origo-cta">
-                  Open Inbox
-                  <ArrowRight className="size-4" />
-                </Link>
+          {slide.full ? (
+            <>
+              <div className="idea-system-head">
+                <p className="idea-eyebrow idea-rise" style={delay(0)}>
+                  {slide.eyebrow}
+                </p>
+                <p className="idea-system-legend idea-rise" style={delay(140)}>
+                  <span className="idea-system-built">● built</span>
+                  <span className="idea-system-designed">○ designed</span>
+                </p>
               </div>
-            )}
-          </div>
+              <Plate />
+            </>
+          ) : (
+            <>
+              <div className="idea-copy">
+                <p className="idea-eyebrow idea-rise" style={delay(0)}>
+                  {slide.eyebrow}
+                </p>
 
-          <div className="idea-plate idea-rise" style={delay(120)}>
-            <Plate />
-          </div>
+                {reduced ? (
+                  <h1 className="idea-statement">{slide.statement}</h1>
+                ) : (
+                  <TextAnimate
+                    as="h1"
+                    className="idea-statement"
+                    animation="blurInUp"
+                    by="word"
+                    duration={0.6}
+                    delay={0.12}
+                    startOnView={false}
+                    once
+                  >
+                    {slide.statement}
+                  </TextAnimate>
+                )}
+
+                <p className="idea-note idea-rise" style={delay(420)}>
+                  {slide.note}
+                </p>
+
+                {slide.cta && (
+                  <div className="idea-rise" style={delay(640)}>
+                    <Link to="/inbox" className="origo-cta">
+                      Open Inbox
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              <div className="idea-plate idea-rise" style={delay(120)}>
+                <Plate />
+              </div>
+            </>
+          )}
         </section>
       </div>
 
