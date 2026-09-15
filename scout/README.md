@@ -1,39 +1,83 @@
-# Agent Starter
+# Aeroframe design prototype
 
-![npm i agents command](./npm-agents-banner.svg)
+An interactive hurricane-resilient architectural concept workspace. The design
+UI runs locally without a Speckle account, Cloudflare login, or API key.
 
-<a href="https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agents-starter"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"/></a>
+## Run on Windows (beginner-friendly)
 
-A starter template for building AI chat agents on Cloudflare, powered by the [Agents SDK](https://developers.cloudflare.com/agents/).
+### 1. Install the prerequisites
 
-Uses Workers AI (no API key required), with tools for weather, timezone detection, calculations with approval, task scheduling, and vision (image input).
+1. Install [Git for Windows](https://git-scm.com/download/win). Accept the
+   installer defaults.
+2. Install the **LTS** version of [Node.js](https://nodejs.org/). Node includes
+   `corepack`, which will install the package manager used by this repository.
+3. Open **PowerShell** from the Windows Start menu.
+4. Check both installations:
 
-## Quick start
+   ```powershell
+   git --version
+   node --version
+   ```
 
-```bash
-npx create-cloudflare@latest --template cloudflare/agents-starter
-cd agents-starter
-npm install
-npm run dev
+### 2. Get this task's code
+
+Use the task/repository page's **Code**, **Clone**, or **Download** control.
+
+**If it provides a Git URL**, copy that URL and run:
+
+```powershell
+cd $HOME\Downloads
+git clone <paste-the-repository-url-here> origin
+cd origin
+git checkout work
 ```
 
-> **Cloudflare authentication is required to run locally.** This template uses
-> Workers AI with `"ai": { "remote": true }` in `wrangler.jsonc`, and Workers AI
-> has no local simulator — so `npm run dev` opens a remote proxy session against
-> Cloudflare and needs you to be authenticated. Either run `wrangler login` once
-> in an interactive terminal, or set a `CLOUDFLARE_API_TOKEN` environment
-> variable (e.g. in a `.env` file). No third-party (OpenAI/Anthropic) key is
-> needed, but a Cloudflare login is.
+If `git checkout work` says the branch does not exist, use the branch name shown
+by the task's pull request instead. The Aeroframe implementation was introduced
+in commit `4cb64e4`.
 
-Open [http://localhost:5173](http://localhost:5173) to see your agent in action.
+**If it provides a ZIP download**, extract it, open the extracted folder in
+File Explorer, click the address bar, type `powershell`, and press Enter. You are
+then already inside the project folder and do not need the `git clone` commands.
 
-Try these prompts to see the different features:
+### 3. Install and start the app
 
-- **"What's the weather in Paris?"** — server-side tool (runs automatically)
-- **"What timezone am I in?"** — client-side tool (browser provides the answer)
-- **"Calculate 5000 \* 3"** — approval tool (asks you before running)
-- **"Remind me in 5 minutes to take a break"** — scheduling
-- **Drop an image and ask "What's in this image?"** — vision (image understanding)
+Run these commands from the project folder in PowerShell:
+
+```powershell
+cd scout
+corepack enable
+corepack pnpm install --frozen-lockfile
+corepack pnpm dev
+```
+
+Wait until Vite prints `Local: http://localhost:5173/`, then open
+[http://localhost:5173](http://localhost:5173) in Chrome, Edge, or Firefox.
+Keep PowerShell open while using the app. Press **Ctrl+C** in PowerShell to stop
+the server.
+
+> The first install needs an internet connection to download dependencies. A
+> proxy warning or a message about falling back to a placeholder `Request.cf`
+> object does not prevent the design workspace from running locally.
+
+### 4. Try the complete workflow
+
+1. Change **Width**, **Depth**, **Height**, or **Orientation** in the left panel.
+2. Drag in the viewport to orbit, right-drag to pan, and scroll to zoom.
+3. Select a roof form and click **Save current** in the bottom tray.
+4. Change the roof and **Floor elevation**, then click **Save current** again.
+5. Click **Compare (2)** to compare the saved parameters.
+6. Reload the page: saved alternatives remain in this browser's local storage.
+
+### Troubleshooting
+
+- **`git` is not recognized:** close and reopen PowerShell after installing Git.
+- **`node` is not recognized:** close and reopen PowerShell after installing Node.
+- **Corepack asks to download pnpm:** enter `Y`; this is expected the first time.
+- **Port 5173 is already in use:** Vite prints another local URL, such as
+  `http://localhost:5174/`; open the URL that Vite prints.
+- **Dependency installation fails behind a work proxy:** try a personal network
+  or ask the network administrator to allow `registry.npmjs.org`.
 
 ## Project structure
 
